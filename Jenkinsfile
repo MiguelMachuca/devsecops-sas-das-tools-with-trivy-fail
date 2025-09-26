@@ -46,15 +46,25 @@ pipeline {
 
     stage('SCA - Dependency Check (OWASP dependency-check)') {
       agent {
-        docker { image 'owasp/dependency-check:latest' }
+        docker { 
+          image 'owasp/dependency-check:latest'
+          args '--network=host'
+        }
       }
       steps {
         echo "Running SCA / Dependency-Check..."
-        sh '''
-          mkdir -p dependency-check-reports
-          dependency-check --project "devsecops-labs" --scan . --format JSON --out dependency-check-reports || true
-        '''
-        archiveArtifacts artifacts: 'dependency-check-reports/**', allowEmptyArchive: true
+        script {
+          try {
+            sh '''
+              mkdir -p dependency-check-reports
+              timeout 600 dependency-check --project "devsecops-labs" --scan . --format JSON --out dependency-check-reports
+            '''
+            archiveArtifacts artifacts: 'dependency-check-reports/**', allowEmptyArchive: true
+          } catch (Exception e) {
+            echo "WARNING: Dependency Check failed. Continuing pipeline..."
+            // No fallar el pipeline completo
+          }
+        }
       }
     }
 

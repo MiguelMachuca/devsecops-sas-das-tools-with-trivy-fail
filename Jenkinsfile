@@ -6,18 +6,37 @@ pipeline {
     DOCKER_CREDENTIALS = "docker-registry-credentials"
     GIT_CREDENTIALS = "git-credentials"
     DOCKER_IMAGE_NAME = "mangelmy/devsecops-app:latest"
-    //DOCKER_IMAGE_NAME = "${env.DOCKER_REGISTRY}/devsecops-labs/app:latest"
     SSH_CREDENTIALS = "ssh-deploy-key"
     STAGING_URL = "http://localhost:3000"
+    // Nuevas variables para reportes
+    REPORTS_DIR = "${WORKSPACE}/security-reports"
+    BUILD_NUMBER = "${env.BUILD_NUMBER}"
+    JOB_NAME = "${env.JOB_NAME}"
   }
 
   options {
     timestamps()
     buildDiscarder(logRotator(numToKeepStr: '20'))
     ansiColor('xterm')
+    // Preservar workspace para reportes
+    preserveStashes(buildCount: 5)
   }
 
   stages {
+
+    stage('Preparación Workspace') {
+      steps {
+        echo "Preparando directorio para reportes..."
+        sh '''
+          mkdir -p ${REPORTS_DIR}
+          mkdir -p ${REPORTS_DIR}/sast
+          mkdir -p ${REPORTS_DIR}/sca
+          mkdir -p ${REPORTS_DIR}/container-scan
+          mkdir -p ${REPORTS_DIR}/dast
+          ls -la ${REPORTS_DIR}
+        '''
+      }
+    }
 
     stage('Checkout') {
       steps {
@@ -28,42 +47,51 @@ pipeline {
 
     stage('SAST - Semgrep') {
       agent {
-        docker { image 'returntocorp/semgrep:latest' }
+        docker { 
+          image 'returntocorp/semgrep:latest'
+          args '-v ${REPORTS_DIR}:/reports'
+        }
       }
       steps {
         echo "Running Semgrep (SAST)..."
         sh '''
-          semgrep --config=auto --json --output semgrep-results.json src || true
-          cat semgrep-results.json || true
+          semgrep --config=auto --json --output /reports/sast/semgrep-results.json . || true
+          # Generar reporte HTML también
+          semgrep --config=auto --html --output /reports/sast/semgrep-results.html . || true
+          echo "SAST completado - Reportes guardados en ${REPORTS_DIR}/sast/"
         '''
-        archiveArtifacts artifacts: 'semgrep-results.json', allowEmptyArchive: true
       }
       post {
         always {
-          script { sh 'echo "Semgrep done."' }
+          script {
+            echo "Archivando reportes SAST..."
+            archiveArtifacts artifacts: 'security-reports/sast/*', allowEmptyArchive: true
+          }
         }
       }
     }
 
-    stage('SCA - Dependency Check (OWASP dependency-check)') {
+    stage('SCA - Dependency Check') {
       agent {
         docker { 
           image 'owasp/dependency-check:latest'
-          args '--network=host'
+          args '--network=host -v ${REPORTS_DIR}:/reports'
         }
       }
       steps {
         echo "Running SCA / Dependency-Check..."
-        script {
-          try {
-            sh '''
-              mkdir -p dependency-check-reports
-              timeout 600 dependency-check --project "devsecops-labs" --scan . --format JSON --out dependency-check-reports
-            '''
-            archiveArtifacts artifacts: 'dependency-check-reports/**', allowEmptyArchive: true
-          } catch (Exception e) {
-            echo "WARNING: Dependency Check failed. Continuing pipeline..."
-            // No fallar el pipeline completo
+        sh '''
+          mkdir -p /reports/sca
+          timeout 600 dependency-check --project "${JOB_NAME}-${BUILD_NUMBER}" --scan . --format JSON --out /reports/sca/dependency-check-report.json || true
+          dependency-check --project "${JOB_NAME}-${BUILD_NUMBER}" --scan . --format HTML --out /reports/sca/dependency-check-report.html || true
+          echo "SCA completado"
+        '''
+      }
+      post {
+        always {
+          script {
+            echo "Archivando reportes SCA..."
+            archiveArtifacts artifacts: 'security-reports/sca/*', allowEmptyArchive: true
           }
         }
       }
@@ -77,35 +105,43 @@ pipeline {
           cd src
           npm install --no-audit --no-fund
           if [ -f package.json ]; then
-            if npm test --silent; then echo "Tests OK"; else echo "Tests failed (continue)"; fi
+            # Generar reporte de tests
+            mkdir -p ${REPORTS_DIR}/tests
+            npm test --silent -- --reporter=json --outputFile=${REPORTS_DIR}/tests/test-results.json || echo "Tests fallaron pero continuamos"
           fi
         '''
       }
     }
 
     stage('Docker Build & Trivy Scan') {
-        agent { 
-            docker { 
-                image 'docker:latest' 
-                // Agregar args para montar el workspace actual
-                args '-v /var/run/docker.sock:/var/run/docker.sock -v $WORKSPACE:/workspace -w /workspace'
-            }
+      agent { 
+        docker { 
+          image 'docker:latest' 
+          args '-v /var/run/docker.sock:/var/run/docker.sock -v ${WORKSPACE}:/workspace -w /workspace'
         }
-        steps {
-            echo "Building Docker image..."
-            sh '''
-                docker build -t ${DOCKER_IMAGE_NAME} -f Dockerfile .
-            '''
-            echo "Scanning image with Trivy..."
-            sh '''
-                mkdir -p trivy-reports
-                # Usar Trivy instalado en el contenedor en lugar de otro contenedor
-                apk add --no-cache trivy || true
-                trivy image --format json --output trivy-reports/trivy-report.json ${DOCKER_IMAGE_NAME} || true
-                trivy image --severity HIGH,CRITICAL ${DOCKER_IMAGE_NAME} || true
-            '''
-            archiveArtifacts artifacts: 'trivy-reports/trivy-report.json', allowEmptyArchive: true
+      }
+      steps {
+        echo "Building Docker image..."
+        sh '''
+          docker build -t ${DOCKER_IMAGE_NAME} -f Dockerfile .
+        '''
+        echo "Scanning image with Trivy..."
+        sh '''
+          mkdir -p ${REPORTS_DIR}/container-scan
+          # Instalar Trivy
+          apk add --no-cache trivy || true
+          # Scan completo con reportes múltiples
+          trivy image --format json --output ${REPORTS_DIR}/container-scan/trivy-report.json ${DOCKER_IMAGE_NAME} || true
+          trivy image --format table --output ${REPORTS_DIR}/container-scan/trivy-report.txt ${DOCKER_IMAGE_NAME} || true
+          trivy image --severity HIGH,CRITICAL --exit-code 0 ${DOCKER_IMAGE_NAME} || true
+          echo "Trivy scan completado"
+        '''
+      }
+      post {
+        always {
+          archiveArtifacts artifacts: 'security-reports/container-scan/*', allowEmptyArchive: true
         }
+      }
     }
 
     stage('Push Image (optional)') {
@@ -124,57 +160,149 @@ pipeline {
       }
     }
 
-    stage('Deploy to Staging (docker-compose)') {
+    stage('Deploy to Staging') {
       agent { 
         docker {
-            image 'docker/compose:latest'  // Imagen con docker-compose
-            args '-v /var/run/docker.sock:/var/run/docker.sock -v $WORKSPACE:/workspace -w /workspace'
+          image 'docker/compose:latest'
+          args '-v /var/run/docker.sock:/var/run/docker.sock -v ${WORKSPACE}:/workspace -w /workspace'
         }
-       }
+      }
       steps {
         echo "Deploying to staging with docker-compose..."
         sh '''
           docker-compose -f docker-compose.yml down || true
           docker-compose -f docker-compose.yml up -d --build
-          sleep 8
+          sleep 15
           docker ps -a
+          # Verificar que la aplicación esté corriendo
+          curl -f ${STAGING_URL} || echo "La aplicación podría no estar lista aún"
         '''
       }
     }
 
     stage('DAST - OWASP ZAP scan') {
-      agent { label 'docker' }
+      agent { 
+        docker { 
+          image 'owasp/zap2docker-stable:latest'
+          args '--network host -v ${REPORTS_DIR}:/zap/reports'
+        }
+      }
       steps {
         echo "Running DAST (OWASP ZAP) against ${STAGING_URL} ..."
         sh '''
-          mkdir -p zap-reports
-          docker run --rm --network host owasp/zap2docker-stable zap-baseline.py -t ${STAGING_URL} -r zap-reports/zap-report.html || true
+          mkdir -p /zap/reports/dast
+          zap-baseline.py -t ${STAGING_URL} -r /zap/reports/dast/zap-report.html || true
+          # Generar reporte JSON también
+          zap-baseline.py -t ${STAGING_URL} -J /zap/reports/dast/zap-report.json || true
+          echo "DAST completado"
         '''
-        archiveArtifacts artifacts: 'zap-reports/**', allowEmptyArchive: true
+      }
+      post {
+        always {
+          archiveArtifacts artifacts: 'security-reports/dast/*', allowEmptyArchive: true
+        }
       }
     }
 
     stage('Policy Check - Fail on HIGH/CRITICAL CVEs') {
-        steps {
-            sh '''
-                chmod +x scripts/scan_trivy_fail.sh
-                ./scripts/scan_trivy_fail.sh $DOCKER_IMAGE_NAME || exit_code=$?
-                if [ "${exit_code:-0}" -eq 2 ]; then
-                    echo "Failing pipeline due to HIGH/CRITICAL vulnerabilities detected by Trivy."
-                    exit 1
-                fi
-            '''
+      steps {
+        sh '''
+          chmod +x scripts/scan_trivy_fail.sh
+          ./scripts/scan_trivy_fail.sh ${DOCKER_IMAGE_NAME} || exit_code=$?
+          if [ "${exit_code:-0}" -eq 2 ]; then
+            echo "Failing pipeline due to HIGH/CRITICAL vulnerabilities detected by Trivy."
+            exit 1
+          fi
+        '''
+      }
+    }
+
+    stage('Consolidar Reportes') {
+      steps {
+        echo "Consolidando todos los reportes de seguridad..."
+        sh '''
+          # Crear índice de reportes
+          cat > ${REPORTS_DIR}/index.html << EOF
+          <html>
+          <head><title>Security Reports - Build ${BUILD_NUMBER}</title></head>
+          <body>
+          <h1>Security Reports - ${JOB_NAME} - Build ${BUILD_NUMBER}</h1>
+          <ul>
+          <li><a href="sast/semgrep-results.html">SAST - Semgrep Report</a></li>
+          <li><a href="sca/dependency-check-report.html">SCA - Dependency Check Report</a></li>
+          <li><a href="container-scan/trivy-report.txt">Container Scan - Trivy Report</a></li>
+          <li><a href="dast/zap-report.html">DAST - ZAP Report</a></li>
+          </ul>
+          <p>Generated on: $(date)</p>
+          </body>
+          </html>
+          EOF
+          
+          # Crear resumen JSON
+          cat > ${REPORTS_DIR}/summary.json << EOF
+          {
+            "buildNumber": "${BUILD_NUMBER}",
+            "jobName": "${JOB_NAME}",
+            "timestamp": "$(date -Iseconds)",
+            "reports": {
+              "sast": "security-reports/sast/semgrep-results.json",
+              "sca": "security-reports/sca/dependency-check-report.json",
+              "container": "security-reports/container-scan/trivy-report.json",
+              "dast": "security-reports/dast/zap-report.json"
+            }
+          }
+          EOF
+          
+          echo "=== ESTRUCTURA DE REPORTES ==="
+          find ${REPORTS_DIR} -type f | sort
+          echo "=== TAMAÑO DE REPORTES ==="
+          du -sh ${REPORTS_DIR}/*
+        '''
+      }
+      post {
+        always {
+          archiveArtifacts artifacts: 'security-reports/**/*', allowEmptyArchive: true
+          stash name: 'security-reports', includes: 'security-reports/**/*'
         }
-    }    
+      }
+    }
 
   } // stages
 
   post {
     always {
-      echo "Pipeline finished. Collecting artifacts..."
+      echo "=== PIPELINE COMPLETADO ==="
+      echo "Reportes disponibles en: ${REPORTS_DIR}"
+      echo "Build Number: ${BUILD_NUMBER}"
+      
+      script {
+        // Publicar reportes HTML (si hay plugin HTML Publisher)
+        publishHTML([
+          allowMissing: true,
+          alwaysLinkToLastBuild: true,
+          keepAll: true,
+          reportDir: 'security-reports',
+          reportFiles: 'index.html',
+          reportName: 'Security Reports Index'
+        ])
+        
+        // Publicar resultados de tests (si existen)
+        junit allowEmptyResults: true, testResults: 'security-reports/tests/*.xml'
+        
+        // Notificación de resumen
+        def reportFiles = findFiles(glob: 'security-reports/**/*')
+        echo "Total de archivos de reporte generados: ${reportFiles.size()}"
+      }
+    }
+    success {
+      echo "✅ Pipeline ejecutado exitosamente"
+      echo "📊 Reportes de seguridad disponibles en el workspace"
     }
     failure {
-      echo "Pipeline failed!"
+      echo "❌ Pipeline falló - Revisar reportes de seguridad"
+    }
+    unstable {
+      echo "⚠️ Pipeline inestable - Posibles vulnerabilidades encontradas"
     }
   }
 

@@ -8,7 +8,6 @@ pipeline {
     DOCKER_IMAGE_NAME = "mangelmy/devsecops-app:latest"
     SSH_CREDENTIALS = "ssh-deploy-key"
     STAGING_URL = "http://localhost:3000"
-    // Nuevas variables para reportes
     REPORTS_DIR = "${WORKSPACE}/security-reports"
     BUILD_NUMBER = "${env.BUILD_NUMBER}"
     JOB_NAME = "${env.JOB_NAME}"
@@ -18,8 +17,6 @@ pipeline {
     timestamps()
     buildDiscarder(logRotator(numToKeepStr: '20'))
     ansiColor('xterm')
-    // Preservar workspace para reportes
-    preserveStashes(buildCount: 5)
   }
 
   stages {
@@ -33,6 +30,7 @@ pipeline {
           mkdir -p ${REPORTS_DIR}/sca
           mkdir -p ${REPORTS_DIR}/container-scan
           mkdir -p ${REPORTS_DIR}/dast
+          chmod -R 755 ${REPORTS_DIR}
           ls -la ${REPORTS_DIR}
         '''
       }
@@ -49,15 +47,15 @@ pipeline {
       agent {
         docker { 
           image 'returntocorp/semgrep:latest'
-          args '-v ${REPORTS_DIR}:/reports'
+          args '-v ${REPORTS_DIR}:/reports -u root'  # Ejecutar como root
         }
       }
       steps {
         echo "Running Semgrep (SAST)..."
         sh '''
           semgrep --config=auto --json --output /reports/sast/semgrep-results.json . || true
-          # Generar reporte HTML también
-          semgrep --config=auto --html --output /reports/sast/semgrep-results.html . || true
+          # Usar --sarif en lugar de --html (más compatible)
+          semgrep --config=auto --sarif --output /reports/sast/semgrep-results.sarif . || true
           echo "SAST completado - Reportes guardados en ${REPORTS_DIR}/sast/"
         '''
       }
@@ -75,7 +73,7 @@ pipeline {
       agent {
         docker { 
           image 'owasp/dependency-check:latest'
-          args '-v ${REPORTS_DIR}:/reports'
+          args '--network=host -v ${REPORTS_DIR}:/reports -u root'  # Ejecutar como root
         }
       }
       steps {
@@ -98,14 +96,18 @@ pipeline {
     }
 
     stage('Build') {
-      agent { label 'docker' }
+      agent { 
+        docker { 
+          image 'node:18-alpine'
+          args '-u root -w /workspace -v ${WORKSPACE}:/workspace'  # Ejecutar como root
+        }
+      }
       steps {
         echo "Building app (npm install and tests)..."
         sh '''
           cd src
           npm install --no-audit --no-fund
           if [ -f package.json ]; then
-            # Generar reporte de tests
             mkdir -p ${REPORTS_DIR}/tests
             npm test --silent -- --reporter=json --outputFile=${REPORTS_DIR}/tests/test-results.json || echo "Tests fallaron pero continuamos"
           fi
@@ -117,7 +119,7 @@ pipeline {
       agent { 
         docker { 
           image 'docker:latest' 
-          args '-v /var/run/docker.sock:/var/run/docker.sock -v ${WORKSPACE}:/workspace -w /workspace'
+          args '-u root -v /var/run/docker.sock:/var/run/docker.sock -v ${WORKSPACE}:/workspace -w /workspace'
         }
       }
       steps {
@@ -164,7 +166,7 @@ pipeline {
       agent { 
         docker {
           image 'docker/compose:latest'
-          args '-v /var/run/docker.sock:/var/run/docker.sock -v ${WORKSPACE}:/workspace -w /workspace'
+          args '-u root -v /var/run/docker.sock:/var/run/docker.sock -v ${WORKSPACE}:/workspace -w /workspace'
         }
       }
       steps {
@@ -184,7 +186,7 @@ pipeline {
       agent { 
         docker { 
           image 'owasp/zap2docker-stable:latest'
-          args '--network host -v ${REPORTS_DIR}:/zap/reports'
+          args '--network host -v ${REPORTS_DIR}:/zap/reports -u root'  # Ejecutar como root
         }
       }
       steps {
@@ -205,6 +207,12 @@ pipeline {
     }
 
     stage('Policy Check - Fail on HIGH/CRITICAL CVEs') {
+      agent {
+        docker { 
+          image 'docker:latest'
+          args '-u root -v /var/run/docker.sock:/var/run/docker.sock -v ${WORKSPACE}:/workspace -w /workspace'
+        }
+      }
       steps {
         sh '''
           chmod +x scripts/scan_trivy_fail.sh
@@ -228,7 +236,8 @@ pipeline {
           <body>
           <h1>Security Reports - ${JOB_NAME} - Build ${BUILD_NUMBER}</h1>
           <ul>
-          <li><a href="sast/semgrep-results.html">SAST - Semgrep Report</a></li>
+          <li><a href="sast/semgrep-results.json">SAST - Semgrep Report (JSON)</a></li>
+          <li><a href="sast/semgrep-results.sarif">SAST - Semgrep Report (SARIF)</a></li>
           <li><a href="sca/dependency-check-report.html">SCA - Dependency Check Report</a></li>
           <li><a href="container-scan/trivy-report.txt">Container Scan - Trivy Report</a></li>
           <li><a href="dast/zap-report.html">DAST - ZAP Report</a></li>
@@ -276,16 +285,6 @@ pipeline {
       echo "Build Number: ${BUILD_NUMBER}"
       
       script {
-        // Publicar reportes HTML (si hay plugin HTML Publisher)
-        publishHTML([
-          allowMissing: true,
-          alwaysLinkToLastBuild: true,
-          keepAll: true,
-          reportDir: 'security-reports',
-          reportFiles: 'index.html',
-          reportName: 'Security Reports Index'
-        ])
-        
         // Publicar resultados de tests (si existen)
         junit allowEmptyResults: true, testResults: 'security-reports/tests/*.xml'
         
@@ -305,5 +304,4 @@ pipeline {
       echo "⚠️ Pipeline inestable - Posibles vulnerabilidades encontradas"
     }
   }
-
 }

@@ -125,7 +125,11 @@ pipeline {
     }
 
     stage('Deploy to Staging (docker-compose)') {
-      agent { label 'docker' }
+      agent { 
+          image 'docker/compose:latest'  // Imagen con docker-compose
+          args '-v /var/run/docker.sock:/var/run/docker.sock -v $WORKSPACE:/workspace -w /workspace'
+      }
+
       steps {
         echo "Deploying to staging with docker-compose..."
         sh '''

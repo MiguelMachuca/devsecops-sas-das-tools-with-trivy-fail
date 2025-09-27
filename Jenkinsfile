@@ -87,7 +87,7 @@ pipeline {
             docker { 
                 image 'docker:latest' 
                 // Agregar args para montar el workspace actual
-                args '-v /var/run/docker.sock:/var/run/docker.sock -v $(pwd):/workspace -w /workspace'
+                args '-v /var/run/docker.sock:/var/run/docker.sock -v $WORKSPACE:/workspace -w /workspace'
             }
         }
         steps {

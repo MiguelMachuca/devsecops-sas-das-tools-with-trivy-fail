@@ -6,7 +6,7 @@ pipeline {
     DOCKER_CREDENTIALS = "docker-registry-credentials"
     GIT_CREDENTIALS = "git-credentials"
     DOCKER_IMAGE_NAME = "mangelmy/devsecops-app:latest"
-    DOCKER_IMAGE_NAME = "${env.DOCKER_REGISTRY}/devsecops-labs/app:latest"
+    //DOCKER_IMAGE_NAME = "${env.DOCKER_REGISTRY}/devsecops-labs/app:latest"
     SSH_CREDENTIALS = "ssh-deploy-key"
     STAGING_URL = "http://localhost:3000"
   }

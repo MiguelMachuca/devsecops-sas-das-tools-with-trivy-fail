@@ -83,22 +83,28 @@ pipeline {
     }
 
     stage('Docker Build & Trivy Scan') {
-      agent {  label 'docker-agent'       
-        //docker { image 'docker:latest' }
-      }
-      steps {
-        echo "Building Docker image..."
-        sh '''
-          docker build -t ${DOCKER_IMAGE_NAME} -f Dockerfile .
-        '''
-        echo "Scanning image with Trivy..."
-        sh '''
-          mkdir -p trivy-reports
-          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --format json --output trivy-reports/trivy-report.json ${DOCKER_IMAGE_NAME} || true
-          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --severity HIGH,CRITICAL ${DOCKER_IMAGE_NAME} || true
-        '''
-        archiveArtifacts artifacts: 'trivy-reports/**', allowEmptyArchive: true
-      }
+        agent { 
+            docker { 
+                image 'docker:latest' 
+                // Agregar args para montar el workspace actual
+                args '-v /var/run/docker.sock:/var/run/docker.sock -v $(pwd):/workspace -w /workspace'
+            }
+        }
+        steps {
+            echo "Building Docker image..."
+            sh '''
+                docker build -t ${DOCKER_IMAGE_NAME} -f Dockerfile .
+            '''
+            echo "Scanning image with Trivy..."
+            sh '''
+                mkdir -p trivy-reports
+                # Usar Trivy instalado en el contenedor en lugar de otro contenedor
+                apk add --no-cache trivy || true
+                trivy image --format json --output trivy-reports/trivy-report.json ${DOCKER_IMAGE_NAME} || true
+                trivy image --severity HIGH,CRITICAL ${DOCKER_IMAGE_NAME} || true
+            '''
+            archiveArtifacts artifacts: 'trivy-reports/trivy-report.json', allowEmptyArchive: true
+        }
     }
 
     stage('Push Image (optional)') {

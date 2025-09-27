@@ -83,8 +83,8 @@ pipeline {
     }
 
     stage('Docker Build & Trivy Scan') {
-      agent {         
-        docker { image 'docker:latest' }
+      agent {  label 'docker-agent'       
+        //docker { image 'docker:latest' }
       }
       steps {
         echo "Building Docker image..."

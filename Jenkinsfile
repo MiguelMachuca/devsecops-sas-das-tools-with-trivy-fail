@@ -2,7 +2,7 @@ pipeline {
   agent any
 
   environment {
-    DOCKER_REGISTRY = "myregistry.example.com"
+    DOCKER_REGISTRY = "docker.io"
     DOCKER_CREDENTIALS = "docker-registry-credentials"
     GIT_CREDENTIALS = "git-credentials"
     DOCKER_IMAGE_NAME = "${env.DOCKER_REGISTRY}/devsecops-labs/app:latest"

@@ -47,7 +47,7 @@ pipeline {
       agent {
         docker { 
           image 'returntocorp/semgrep:latest'
-          args '-v ${REPORTS_DIR}:/reports -u root'  # Ejecutar como root
+          args '-v ${REPORTS_DIR}:/reports -u root'  
         }
       }
       steps {
@@ -73,7 +73,7 @@ pipeline {
       agent {
         docker { 
           image 'owasp/dependency-check:latest'
-          args '--network=host -v ${REPORTS_DIR}:/reports -u root'  # Ejecutar como root
+          args '--network=host -v ${REPORTS_DIR}:/reports -u root'  
         }
       }
       steps {
@@ -99,7 +99,7 @@ pipeline {
       agent { 
         docker { 
           image 'node:18-alpine'
-          args '-u root -w /workspace -v ${WORKSPACE}:/workspace'  # Ejecutar como root
+          args '-u root -w /workspace -v ${WORKSPACE}:/workspace'  
         }
       }
       steps {
@@ -186,7 +186,7 @@ pipeline {
       agent { 
         docker { 
           image 'owasp/zap2docker-stable:latest'
-          args '--network host -v ${REPORTS_DIR}:/zap/reports -u root'  # Ejecutar como root
+          args '--network host -v ${REPORTS_DIR}:/zap/reports -u root'  
         }
       }
       steps {

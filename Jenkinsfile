@@ -8,11 +8,10 @@ pipeline {
     DOCKER_IMAGE_NAME = "mangelmy/devsecops-app:latest"
     SSH_CREDENTIALS = "ssh-deploy-key"
     STAGING_URL = "http://localhost:3000"
-    REPORTS_DIR = "${WORKSPACE}/security-reports"
+    REPORTS_DIR = "${env.WORKSPACE}/security-reports"
     BUILD_NUMBER = "${env.BUILD_NUMBER}"
     JOB_NAME = "${env.JOB_NAME}"
-    // Agregar variable HOME para evitar problemas de permisos
-    HOME = "${WORKSPACE}"
+    HOME = "${env.WORKSPACE}"
   }
 
   options {
@@ -25,8 +24,11 @@ pipeline {
 
     stage('Preparación Workspace') {
       steps {
+        echo "Workspace actual: ${env.WORKSPACE}"
         echo "Preparando directorio para reportes..."
         sh '''
+          echo "WORKSPACE: ${WORKSPACE}"
+          echo "PWD: $(pwd)"
           mkdir -p ${REPORTS_DIR}
           mkdir -p ${REPORTS_DIR}/sast
           mkdir -p ${REPORTS_DIR}/sca
@@ -50,15 +52,15 @@ pipeline {
       agent {
         docker { 
           image 'returntocorp/semgrep:latest'
-          args '-v ${WORKSPACE}:/app -w /app -u root'  
+          args '-u root -v /var/jenkins_home/workspace/devsecops-pipeline:/app -w /app'
         }
       }
       steps {
         echo "Running Semgrep (SAST)..."
         sh '''
-          semgrep --config=auto --json --output ${REPORTS_DIR}/sast/semgrep-results.json . || true
-          semgrep --config=auto --sarif --output ${REPORTS_DIR}/sast/semgrep-results.sarif . || true
-          echo "SAST completado - Reportes guardados en ${REPORTS_DIR}/sast/"
+          semgrep --config=auto --json --output /app/security-reports/sast/semgrep-results.json . || true
+          semgrep --config=auto --sarif --output /app/security-reports/sast/semgrep-results.sarif . || true
+          echo "SAST completado"
         '''
       }
       post {
@@ -75,14 +77,15 @@ pipeline {
       agent {
         docker { 
           image 'owasp/dependency-check:latest'
-          args '-v ${WORKSPACE}:/src -w /src -u root'
+          args '-u root -v /var/jenkins_home/workspace/devsecops-pipeline:/src -w /src'
         }
       }
       steps {
         echo "Running SCA / Dependency-Check..."
         sh '''
-          dependency-check --project "${JOB_NAME}-${BUILD_NUMBER}" --scan /src --format JSON --out ${REPORTS_DIR}/sca/dependency-check-report.json || true
-          dependency-check --project "${JOB_NAME}-${BUILD_NUMBER}" --scan /src --format HTML --out ${REPORTS_DIR}/sca/dependency-check-report.html || true
+          mkdir -p /src/security-reports/sca
+          dependency-check --project "${JOB_NAME}-${BUILD_NUMBER}" --scan /src --format JSON --out /src/security-reports/sca/dependency-check-report.json || true
+          dependency-check --project "${JOB_NAME}-${BUILD_NUMBER}" --scan /src --format HTML --out /src/security-reports/sca/dependency-check-report.html || true
           echo "SCA completado"
         '''
       }
@@ -100,16 +103,16 @@ pipeline {
       agent { 
         docker { 
           image 'node:18-alpine'
-          args '-u root -v ${WORKSPACE}:/app -w /app -e HOME=/tmp'  
+          args '-u root -v /var/jenkins_home/workspace/devsecops-pipeline:/app -w /app -e HOME=/tmp'  
         }
       }
       steps {
         echo "Building app (npm install and tests)..."
         sh '''
-          cd src
+          cd /app/src
           npm install --no-audit --no-fund
           if [ -f package.json ]; then
-            npm test --silent -- --reporter=json --outputFile=../${REPORTS_DIR}/tests/test-results.json || echo "Tests fallaron pero continuamos"
+            npm test --silent -- --reporter=json --outputFile=/app/security-reports/tests/test-results.json || echo "Tests fallaron pero continuamos"
           fi
         '''
       }
@@ -119,7 +122,7 @@ pipeline {
       agent { 
         docker { 
           image 'docker:latest' 
-          args '-u root -v /var/run/docker.sock:/var/run/docker.sock -v ${WORKSPACE}:/workspace -w /workspace'
+          args '-u root -v /var/run/docker.sock:/var/run/docker.sock -v /var/jenkins_home/workspace/devsecops-pipeline:/workspace -w /workspace'
         }
       }
       steps {
@@ -129,12 +132,10 @@ pipeline {
         '''
         echo "Scanning image with Trivy..."
         sh '''
-          mkdir -p ${REPORTS_DIR}/container-scan
-          # Instalar Trivy
+          mkdir -p /workspace/security-reports/container-scan
           apk add --no-cache trivy || true
-          # Scan completo con reportes múltiples
-          trivy image --format json --output ${REPORTS_DIR}/container-scan/trivy-report.json ${DOCKER_IMAGE_NAME} || true
-          trivy image --format table --output ${REPORTS_DIR}/container-scan/trivy-report.txt ${DOCKER_IMAGE_NAME} || true
+          trivy image --format json --output /workspace/security-reports/container-scan/trivy-report.json ${DOCKER_IMAGE_NAME} || true
+          trivy image --format table --output /workspace/security-reports/container-scan/trivy-report.txt ${DOCKER_IMAGE_NAME} || true
           trivy image --severity HIGH,CRITICAL --exit-code 0 ${DOCKER_IMAGE_NAME} || true
           echo "Trivy scan completado"
         '''

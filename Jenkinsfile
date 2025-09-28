@@ -109,7 +109,7 @@ pipeline {
       steps {
         echo "Building app (npm install and tests)..."
         sh '''
-          cd /app/src
+          cd src
           npm install --no-audit --no-fund
           if [ -f package.json ]; then
             npm test --silent -- --reporter=json --outputFile=/app/security-reports/tests/test-results.json || echo "Tests fallaron pero continuamos"

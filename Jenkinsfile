@@ -83,10 +83,11 @@ pipeline {
         echo "Scanning image with Trivy..."
         sh '''
           mkdir -p trivy-reports
-          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --format json --output trivy-report.json ${DOCKER_IMAGE_NAME} || true
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v $(pwd):/workspace -w /workspace aquasec/trivy:latest image --format json --output trivy-reports/trivy-report.json ${DOCKER_IMAGE_NAME} || true
+
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --severity HIGH,CRITICAL ${DOCKER_IMAGE_NAME} || true
         '''
-        archiveArtifacts artifacts: 'trivy-report.json', allowEmptyArchive: true
+        archiveArtifacts artifacts: 'trivy-reports/trivy-report.json', allowEmptyArchive: true
       }
     }
 

@@ -2,11 +2,10 @@ pipeline {
   agent any
 
   environment {
-    DOCKER_REGISTRY = "docker.io"
+    DOCKER_REGISTRY = "myregistry.example.com"
     DOCKER_CREDENTIALS = "docker-registry-credentials"
     GIT_CREDENTIALS = "git-credentials"
-    DOCKER_IMAGE_NAME = "mangelmy/devsecops-app:latest"
-    //DOCKER_IMAGE_NAME = "${env.DOCKER_REGISTRY}/devsecops-labs/app:latest"
+    DOCKER_IMAGE_NAME = "${env.DOCKER_REGISTRY}/devsecops-labs/app:latest"
     SSH_CREDENTIALS = "ssh-deploy-key"
     STAGING_URL = "http://localhost:3000"
   }
@@ -141,8 +140,8 @@ pipeline {
                 exit 1
             fi
         '''
-     }
     }
+}
 
   } // stages
 
@@ -154,4 +153,6 @@ pipeline {
       echo "Pipeline failed!"
     }
   }
+
+
 }

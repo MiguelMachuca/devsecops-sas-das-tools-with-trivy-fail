@@ -11,6 +11,8 @@ pipeline {
     REPORTS_DIR = "${WORKSPACE}/security-reports"
     BUILD_NUMBER = "${env.BUILD_NUMBER}"
     JOB_NAME = "${env.JOB_NAME}"
+    // Agregar variable HOME para evitar problemas de permisos
+    HOME = "${WORKSPACE}"
   }
 
   options {
@@ -30,6 +32,7 @@ pipeline {
           mkdir -p ${REPORTS_DIR}/sca
           mkdir -p ${REPORTS_DIR}/container-scan
           mkdir -p ${REPORTS_DIR}/dast
+          mkdir -p ${REPORTS_DIR}/tests
           chmod -R 755 ${REPORTS_DIR}
           ls -la ${REPORTS_DIR}
         '''
@@ -47,15 +50,14 @@ pipeline {
       agent {
         docker { 
           image 'returntocorp/semgrep:latest'
-          args '-v ${REPORTS_DIR}:/reports -u root'  
+          args '-v ${WORKSPACE}:/app -w /app -u root'  
         }
       }
       steps {
         echo "Running Semgrep (SAST)..."
         sh '''
-          semgrep --config=auto --json --output /reports/sast/semgrep-results.json . || true
-          # Usar --sarif en lugar de --html (más compatible)
-          semgrep --config=auto --sarif --output /reports/sast/semgrep-results.sarif . || true
+          semgrep --config=auto --json --output ${REPORTS_DIR}/sast/semgrep-results.json . || true
+          semgrep --config=auto --sarif --output ${REPORTS_DIR}/sast/semgrep-results.sarif . || true
           echo "SAST completado - Reportes guardados en ${REPORTS_DIR}/sast/"
         '''
       }
@@ -73,15 +75,14 @@ pipeline {
       agent {
         docker { 
           image 'owasp/dependency-check:latest'
-          args '-v /var/run/docker.sock:/var/run/docker.sock -u root -v ${REPORTS_DIR}:/reports'
+          args '-v ${WORKSPACE}:/src -w /src -u root'
         }
       }
       steps {
         echo "Running SCA / Dependency-Check..."
         sh '''
-          mkdir -p /reports/sca
-          timeout 600 dependency-check --project "${JOB_NAME}-${BUILD_NUMBER}" --scan . --format JSON --out /reports/sca/dependency-check-report.json || true
-          dependency-check --project "${JOB_NAME}-${BUILD_NUMBER}" --scan . --format HTML --out /reports/sca/dependency-check-report.html || true
+          dependency-check --project "${JOB_NAME}-${BUILD_NUMBER}" --scan /src --format JSON --out ${REPORTS_DIR}/sca/dependency-check-report.json || true
+          dependency-check --project "${JOB_NAME}-${BUILD_NUMBER}" --scan /src --format HTML --out ${REPORTS_DIR}/sca/dependency-check-report.html || true
           echo "SCA completado"
         '''
       }
@@ -99,7 +100,7 @@ pipeline {
       agent { 
         docker { 
           image 'node:18-alpine'
-          args '-u root -w /workspace -v ${WORKSPACE}:/workspace'  
+          args '-u root -v ${WORKSPACE}:/app -w /app -e HOME=/tmp'  
         }
       }
       steps {
@@ -108,8 +109,7 @@ pipeline {
           cd src
           npm install --no-audit --no-fund
           if [ -f package.json ]; then
-            mkdir -p ${REPORTS_DIR}/tests
-            npm test --silent -- --reporter=json --outputFile=${REPORTS_DIR}/tests/test-results.json || echo "Tests fallaron pero continuamos"
+            npm test --silent -- --reporter=json --outputFile=../${REPORTS_DIR}/tests/test-results.json || echo "Tests fallaron pero continuamos"
           fi
         '''
       }

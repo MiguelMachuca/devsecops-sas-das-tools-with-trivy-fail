@@ -73,7 +73,7 @@ pipeline {
       agent {
         docker { 
           image 'owasp/dependency-check:latest'
-          args '--network=host -v ${REPORTS_DIR}:/reports -u root'  
+          args '-v /var/run/docker.sock:/var/run/docker.sock -u root -v ${REPORTS_DIR}:/reports'
         }
       }
       steps {

@@ -83,8 +83,8 @@ pipeline {
         echo "Scanning image with Trivy..."
         sh '''
           mkdir -p trivy-reports
-          ls -la
-          docker run --rm -v ${pwd}:/trivy-reports aquasec/trivy:latest image --format json --output trivy-reports/trivy-report.json ${DOCKER_IMAGE_NAME} || true
+          
+          docker run --rm -v "$PWD:/trivy-reports" aquasec/trivy:latest image --format json --output trivy-reports/trivy-report.json ${DOCKER_IMAGE_NAME} || true
 
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --severity HIGH,CRITICAL ${DOCKER_IMAGE_NAME} || true
         '''

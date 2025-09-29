@@ -45,27 +45,24 @@ pipeline {
       }
     }
 
-    stage('SCA - Dependency Check (OWASP dependency-check)') {
-      agent {
-        docker { 
-          image 'owasp/dependency-check:latest'
-          args '--network=host'
-        }
-      }
-      steps {
-        echo "Running SCA / Dependency-Check..."
-        script {
-          try {
-            sh '''
-              dependency-check --project "devsecops-labs" --scan . --format JSON --out check-reports.json
-            '''
-            archiveArtifacts artifacts: '**', allowEmptyArchive: true
-          } catch (Exception e) {
-            echo "WARNING: Dependency Check failed. Continuing pipeline..."
+    stage('SCA - Dependency Check') {
+        steps {         
+            dependencyCheck (
+                odcInstallation: 'OWASP-Dependency-Check', 
+                additionalArguments: '''
+                    --project "devsecops-labs" 
+                    --scan . 
+                    --format JSON 
+                    --format HTML
+                    --prettyPrint
+                    --nvdApiKey ${NVD_API_KEY}  # Opcional: para mejores velocidades
+                '''
+            )
 
-          }
+            dependencyCheckPublisher pattern: 'dependency-check-report.json'
+
+            archiveArtifacts artifacts: 'dependency-check-report.json', allowEmptyArchive: true
         }
-      }
     }
 
     stage('Build') {
@@ -96,11 +93,12 @@ pipeline {
             '''
             echo "Scanning image with Trivy..."
             sh '''                
+                mkdir reporte-trivy
                 apk add --no-cache trivy || true
-                trivy image --format json --output trivy-report.json ${DOCKER_IMAGE_NAME} || true
+                trivy image --format json --output reporte-trivy/trivy-report.json ${DOCKER_IMAGE_NAME} || true
                 trivy image --severity HIGH,CRITICAL ${DOCKER_IMAGE_NAME} || true
             '''
-            archiveArtifacts artifacts: '**', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'reporte-trivy/**', allowEmptyArchive: true
         }
     }
 

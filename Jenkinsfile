@@ -48,7 +48,7 @@ pipeline {
     stage('SCA - Dependency Check') {
         steps {         
             dependencyCheck (
-                odcInstallation: 'OWASP Dependency-Check Plugin', 
+                odcInstallation: 'OWASP-DepCheck-10', 
                 additionalArguments: '''
                     --project "devsecops-labs" 
                     --scan . 

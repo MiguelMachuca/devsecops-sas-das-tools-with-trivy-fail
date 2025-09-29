@@ -131,19 +131,31 @@ pipeline {
       }
     }
 
-    stage('DAST - OWASP ZAP scan') {
-        // Asigna este stage a un agente con ZAP y Java instalados
-        agent { label 'zap-native' }
+    stage('DAST - OWASP ZAP Scan') {
         steps {
-            echo "Running DAST (OWASP ZAP) against ${STAGING_URL} ..."
-            sh """
-                mkdir -p zap-reports
-                # Asegúrate de que la ruta al script de ZAP es correcta
-                zap-baseline.py -t ${STAGING_URL} -r zap-reports/zap-report.html
-            """
-            archiveArtifacts artifacts: 'zap-reports/zap-report.html', allowEmptyArchive: true
+            script {
+                // 1. Iniciar ZAP
+                startZap(host: "127.0.0.1", port: 9091, timeout: 5000)
+                // 2. (Opcional) Ejecutar el rastreador en tu aplicación desplegada
+                runZapCrawler(host: "${STAGING_URL}")
+                // 3. Ejecutar el escaneo activo
+                runZapAttack() // Escanea todos los URLs descubiertos
+            }
         }
-    }   
+        post {
+            always {
+                script {
+                    // 4. Generar, archivar el reporte y evaluar alertas
+                    archiveZap(
+                        failAllAlerts: 0,     // No fallar por el total de alertas
+                        failHighAlerts: 1,    // Fallar el build si hay AL MENOS 1 alerta de riesgo Alto
+                        failMediumAlerts: 5,  // Fallar el build si hay más de 5 alertas de riesgo Medio
+                        failLowAlerts: 0      // No fallar por alertas Bajas
+                    )
+                }
+            }
+        }
+    }  
 
     stage('Policy Check - Fail on HIGH/CRITICAL CVEs') {
     steps {

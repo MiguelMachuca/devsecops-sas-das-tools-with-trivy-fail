@@ -77,32 +77,33 @@ pipeline {
         '''
       }
     }
+    
+    steps('Docker Build & Trivy Scan') {
+        echo "Building Docker image..."
+        sh '''
+            docker build -t ${DOCKER_IMAGE_NAME} -f Dockerfile .
+        '''
+        echo "Scanning image with Trivy..."
+        sh '''                
+            // Install Trivy using the official method
+            wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | apt-key add -
+            echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | tee -a /etc/apt/sources.list.d/trivy.list
+            apt-get update
+            apt-get install -y trivy
 
-    stage('Docker Build & Trivy Scan') {
-        agent { 
-            docker { 
-                image 'docker:latest'             
-                args '-v /var/run/docker.sock:/var/run/docker.sock -v $WORKSPACE:/workspace -w /workspace'
-            }
-        }
-        steps {
-            echo "Building Docker image..."
-            sh '''
-                docker build -t ${DOCKER_IMAGE_NAME} -f Dockerfile .
-            '''
-            echo "Scanning image with Trivy..."
-            sh '''                
-                
-                apk add --no-cache trivy || true
+            // Alternatively, if you are on an Alpine-based image, you can download the binary directly:
+            // wget https://github.com/aquasecurity/trivy/releases/download/v0.18.3/trivy_0.18.3_Linux-64bit.tar.gz
+            // tar -xzf trivy_0.18.3_Linux-64bit.tar.gz
+            // sudo mv trivy /usr/local/bin/
 
-                trivy image --severity HIGH,CRITICAL ${DOCKER_IMAGE_NAME} || true
+            // Ensure the output directory exists
+            mkdir -p reporte-trivy
 
-                trivy image --format json --output reporte-trivy/trivy-report.json ${DOCKER_IMAGE_NAME} || true
-                
-            '''
-            archiveArtifacts artifacts: 'reporte-trivy/**', allowEmptyArchive: true
-        }
-    }
+            // Run Trivy scan and generate JSON report
+            trivy image --format json --output reporte-trivy/trivy-report.json ${DOCKER_IMAGE_NAME}
+        '''
+        archiveArtifacts artifacts: 'reporte-trivy/trivy-report.json', allowEmptyArchive: true
+    }    
 
     stage('Push Image (optional)') {
       when {
@@ -119,6 +120,8 @@ pipeline {
         }
       }
     }
+
+    
 
     stage('Deploy to Staging (docker-compose)') {
       agent { label 'docker' }

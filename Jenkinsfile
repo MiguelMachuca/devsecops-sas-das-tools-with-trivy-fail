@@ -92,7 +92,7 @@ pipeline {
             '''
             echo "Scanning image with Trivy..."
             sh '''                
-                mkdir reporte-trivy
+                
                 apk add --no-cache trivy || true
 
                 trivy image --severity HIGH,CRITICAL ${DOCKER_IMAGE_NAME} || true

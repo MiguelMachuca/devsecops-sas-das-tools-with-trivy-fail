@@ -136,14 +136,14 @@ pipeline {
         agent any
         steps {
             echo "Running DAST (OWASP ZAP) against ${STAGING_URL} ..."
-            sh """
+            sh '''
                 mkdir -p zap-reports
                 # Usa el flag -v para montar el volumen de forma explícita
                 docker run --rm \\
                     -v $(pwd)/zap-reports:/zap/wrk/:rw \\
                     ghcr.io/zaproxy/zaproxy:stable \\
                     zap-baseline.py -t ${STAGING_URL} -r /zap/wrk/zap-report.html
-            """
+            '''
             archiveArtifacts artifacts: 'zap-reports/zap-report.html', allowEmptyArchive: true
         }
     }    

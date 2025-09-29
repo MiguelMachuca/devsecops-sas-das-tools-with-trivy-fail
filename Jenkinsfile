@@ -131,18 +131,22 @@ pipeline {
       }
     }
 
-    stage('DAST - OWASP ZAP scan') {
-      agent { label 'docker' }
-      steps {
-        echo "Running DAST (OWASP ZAP) against ${STAGING_URL} ..."
-        sh '''
-          mkdir -p zap-reports
-          # Use the correct, official Docker image
-          docker run --rm --network host ghcr.io/zaproxy/zaproxy:stable zap-baseline.py -t ${STAGING_URL} -r zap-reports/zap-report.html
-        '''
-        archiveArtifacts artifacts: 'zap-reports/zap-report.html', allowEmptyArchive: true
-      }
-    }
+    stage('DAST - OWASP ZAP scan ') {
+        // Usa un agente genérico que tenga Docker instalado
+        agent any
+        steps {
+            echo "Running DAST (OWASP ZAP) against ${STAGING_URL} ..."
+            sh """
+                mkdir -p zap-reports
+                # Usa el flag -v para montar el volumen de forma explícita
+                docker run --rm \\
+                    -v $(pwd)/zap-reports:/zap/wrk/:rw \\
+                    ghcr.io/zaproxy/zaproxy:stable \\
+                    zap-baseline.py -t ${STAGING_URL} -r /zap/wrk/zap-report.html
+            """
+            archiveArtifacts artifacts: 'zap-reports/zap-report.html', allowEmptyArchive: true
+        }
+    }    
 
     stage('Policy Check - Fail on HIGH/CRITICAL CVEs') {
     steps {

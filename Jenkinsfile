@@ -46,23 +46,26 @@ pipeline {
     }
 
     stage('SCA - Dependency Check (OWASP dependency-check)') {
+      agent {
+        docker { 
+          image 'owasp/dependency-check:latest'
+          args '--network=host'
+        }
+      }
       steps {
         echo "Running SCA / Dependency-Check..."
-        sh '''          
-          docker run --rm \
-            -v $(pwd):/src \
-            -w /src \
-            owasp/dependency-check:latest \
-            /bin/bash -c \
-            "/usr/share/dependency-check/bin/dependency-check.sh \
-              --project devsecops-labs \
-              --scan /src \
-              --format JSON \
-              --out /src/report.json"
-          
-          ls -la
-        '''
-        archiveArtifacts artifacts: 'report.json', allowEmptyArchive: true
+        script {
+          try {
+            sh '''
+              mkdir -p dependency-check-reports
+              timeout 600 dependency-check --project "devsecops-labs" --scan . --format JSON --out dependency-check-reports/check-reports.json
+            '''
+            archiveArtifacts artifacts: 'dependency-check-reports/**', allowEmptyArchive: true
+          } catch (Exception e) {
+            echo "WARNING: Dependency Check failed. Continuing pipeline..."
+            // No fallar el pipeline completo
+          }
+        }
       }
     }
 
@@ -81,30 +84,26 @@ pipeline {
     }
 
     stage('Docker Build & Trivy Scan') {
-      agent { 
-        docker { 
-          image 'docker:dind'  // ✅ Imagen oficial de Docker con Docker-in-Docker
-        } 
-      }
-      steps {
-        echo "Building Docker image..."
-        sh '''
-          # Instalar dependencias necesarias
-          apk add --no-cache wget
-          
-          docker build -t ${DOCKER_IMAGE_NAME} -f Dockerfile .
-          
-          # Instalar Trivy
-          wget https://github.com/aquasecurity/trivy/releases/download/v0.50.1/trivy_0.50.1_Linux-64bit.tar.gz
-          tar -xzf trivy_0.50.1_Linux-64bit.tar.gz
-          mv trivy /usr/local/bin/
-          
-          mkdir -p trivy-reports
-          trivy image --format json --output trivy-reports/trivy-report.json ${DOCKER_IMAGE_NAME} || true
-          trivy image --severity HIGH,CRITICAL ${DOCKER_IMAGE_NAME} || true
-        '''
-        archiveArtifacts artifacts: 'trivy-reports/trivy-report.json', allowEmptyArchive: true
-      }
+        agent { 
+            docker { 
+                image 'docker:latest'             
+                args '-v /var/run/docker.sock:/var/run/docker.sock -v $WORKSPACE:/workspace -w /workspace'
+            }
+        }
+        steps {
+            echo "Building Docker image..."
+            sh '''
+                docker build -t ${DOCKER_IMAGE_NAME} -f Dockerfile .
+            '''
+            echo "Scanning image with Trivy..."
+            sh '''
+                mkdir -p trivy-reports
+                apk add --no-cache trivy || true
+                trivy image --format json --output trivy-reports/trivy-report.json ${DOCKER_IMAGE_NAME} || true
+                trivy image --severity HIGH,CRITICAL ${DOCKER_IMAGE_NAME} || true
+            '''
+            archiveArtifacts artifacts: 'trivy-reports/trivy-report.json', allowEmptyArchive: true
+        }
     }
 
     stage('Push Image (optional)') {

@@ -86,8 +86,7 @@ pipeline {
     stage('Docker Build & Trivy Scan') {
         agent { 
             docker { 
-                image 'docker:latest' 
-                // Agregar args para montar el workspace actual
+                image 'docker:latest'             
                 args '-v /var/run/docker.sock:/var/run/docker.sock -v $WORKSPACE:/workspace -w /workspace'
             }
         }
@@ -99,7 +98,6 @@ pipeline {
             echo "Scanning image with Trivy..."
             sh '''
                 mkdir -p trivy-reports
-                # Usar Trivy instalado en el contenedor en lugar de otro contenedor
                 apk add --no-cache trivy || true
                 trivy image --format json --output trivy-reports/trivy-report.json ${DOCKER_IMAGE_NAME} || true
                 trivy image --severity HIGH,CRITICAL ${DOCKER_IMAGE_NAME} || true

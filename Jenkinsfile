@@ -134,28 +134,26 @@ pipeline {
     stage('DAST - OWASP ZAP Scan') {
         steps {
             script {
-                // 1. Iniciar ZAP
-                startZap(host: "127.0.0.1", port: 9091, timeout: 5000)
-                // 2. (Opcional) Ejecutar el rastreador en tu aplicación desplegada
+                // Example for a Linux agent. The path must be where ZAP is installed on your build machine.
+                startZap(host: "127.0.0.1", port: 9091, timeout: 5000, zapHome: "/usr/share/zaproxy")
                 runZapCrawler(host: "${STAGING_URL}")
-                // 3. Ejecutar el escaneo activo
-                runZapAttack() // Escanea todos los URLs descubiertos
+                runZapAttack()
             }
         }
         post {
             always {
                 script {
-                    // 4. Generar, archivar el reporte y evaluar alertas
+                    // Generate and archive the report
                     archiveZap(
-                        failAllAlerts: 0,     // No fallar por el total de alertas
-                        failHighAlerts: 1,    // Fallar el build si hay AL MENOS 1 alerta de riesgo Alto
-                        failMediumAlerts: 5,  // Fallar el build si hay más de 5 alertas de riesgo Medio
-                        failLowAlerts: 0      // No fallar por alertas Bajas
+                        failAllAlerts: 0,
+                        failHighAlerts: 1,
+                        failMediumAlerts: 5,
+                        failLowAlerts: 0
                     )
                 }
             }
         }
-    }  
+    } 
 
     stage('Policy Check - Fail on HIGH/CRITICAL CVEs') {
     steps {
@@ -170,7 +168,7 @@ pipeline {
      }
     }
 
-  } // stages
+  } 
 
   post {
     always {

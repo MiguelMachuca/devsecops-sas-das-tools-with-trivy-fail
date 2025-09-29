@@ -51,11 +51,10 @@ pipeline {
       }
       steps {
         echo "Running SCA / Dependency-Check..."
-        sh '''
-          mkdir -p dependency-check-reports
+        sh '''          
           dependency-check --project "devsecops-labs" --scan . --format JSON --out dependency-check-reports || true
         '''
-        archiveArtifacts artifacts: 'dependency-check-reports/**', allowEmptyArchive: true
+        archiveArtifacts artifacts: 'dependency-check-report.json', allowEmptyArchive: true
       }
     }
 
@@ -74,19 +73,24 @@ pipeline {
     }
 
     stage('Docker Build & Trivy Scan') {
-      agent { label 'docker' }
+      agent { 
+        docker { 
+          image 'alpine/docker:latest'  // Imagen que tiene ambos: Docker y capacidad para descargar Trivy
+        } 
+      }
       steps {
         echo "Building Docker image..."
         sh '''
           docker build -t ${DOCKER_IMAGE_NAME} -f Dockerfile .
-        '''
-        echo "Scanning image with Trivy..."
-        sh '''
-          mkdir -p trivy-reports
           
-          docker run --rm -v "$PWD:/trivy-reports" aquasec/trivy:latest image --format json --output trivy-reports/trivy-report.json ${DOCKER_IMAGE_NAME} || true
-
-          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --severity HIGH,CRITICAL ${DOCKER_IMAGE_NAME} || true
+          # Instalar Trivy directamente en el contenedor
+          wget https://github.com/aquasecurity/trivy/releases/download/v0.50.1/trivy_0.50.1_Linux-64bit.tar.gz
+          tar -xzf trivy_0.50.1_Linux-64bit.tar.gz
+          mv trivy /usr/local/bin/
+          
+          mkdir -p trivy-reports
+          trivy image --format json --output trivy-reports/trivy-report.json ${DOCKER_IMAGE_NAME} || true
+          trivy image --severity HIGH,CRITICAL ${DOCKER_IMAGE_NAME} || true
         '''
         archiveArtifacts artifacts: 'trivy-reports/trivy-report.json', allowEmptyArchive: true
       }

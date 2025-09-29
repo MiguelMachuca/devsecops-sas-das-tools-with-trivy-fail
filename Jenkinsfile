@@ -57,13 +57,12 @@ pipeline {
         script {
           try {
             sh '''
-              mkdir -p dependency-check-reports
-              timeout 600 dependency-check --project "devsecops-labs" --scan . --format JSON --out dependency-check-reports/check-reports.json
+              dependency-check --project "devsecops-labs" --scan . --format JSON --out check-reports.json
             '''
-            archiveArtifacts artifacts: 'dependency-check-reports/**', allowEmptyArchive: true
+            archiveArtifacts artifacts: '**', allowEmptyArchive: true
           } catch (Exception e) {
             echo "WARNING: Dependency Check failed. Continuing pipeline..."
-            // No fallar el pipeline completo
+
           }
         }
       }
@@ -96,13 +95,12 @@ pipeline {
                 docker build -t ${DOCKER_IMAGE_NAME} -f Dockerfile .
             '''
             echo "Scanning image with Trivy..."
-            sh '''
-                mkdir -p trivy-reports
+            sh '''                
                 apk add --no-cache trivy || true
-                trivy image --format json --output trivy-reports/trivy-report.json ${DOCKER_IMAGE_NAME} || true
+                trivy image --format json --output trivy-report.json ${DOCKER_IMAGE_NAME} || true
                 trivy image --severity HIGH,CRITICAL ${DOCKER_IMAGE_NAME} || true
             '''
-            archiveArtifacts artifacts: 'trivy-reports/trivy-report.json', allowEmptyArchive: true
+            archiveArtifacts artifacts: '**', allowEmptyArchive: true
         }
     }
 

@@ -135,7 +135,7 @@ pipeline {
         steps {
             script {
                 // Example for a Linux agent. The path must be where ZAP is installed on your build machine.
-                startZap(host: "127.0.0.1", port: 9091, timeout: 5000, externalZap: true)
+                startZap(host: "127.0.0.1", port: 3000, timeout: 5000, externalZap: true)
                 runZapCrawler(host: "${STAGING_URL}")
                 runZapAttack()
             }

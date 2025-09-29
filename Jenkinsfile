@@ -94,8 +94,11 @@ pipeline {
             sh '''                
                 mkdir reporte-trivy
                 apk add --no-cache trivy || true
-                trivy image --format json --output reporte-trivy/trivy-report.json ${DOCKER_IMAGE_NAME} || true
+
                 trivy image --severity HIGH,CRITICAL ${DOCKER_IMAGE_NAME} || true
+
+                trivy image --format json --output reporte-trivy/trivy-report.json ${DOCKER_IMAGE_NAME} || true
+                
             '''
             archiveArtifacts artifacts: 'reporte-trivy/**', allowEmptyArchive: true
         }

@@ -79,31 +79,28 @@ pipeline {
     }
 
     stage('Docker Build & Trivy Scan') {
-        echo "Building Docker image..."
-        sh '''
-            docker build -t ${DOCKER_IMAGE_NAME} -f Dockerfile .
-        '''
-        echo "Scanning image with Trivy..."
-        sh '''                
-            // Install Trivy using the official method
-            wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | apt-key add -
-            echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | tee -a /etc/apt/sources.list.d/trivy.list
-            apt-get update
-            apt-get install -y trivy
-
-            // Alternatively, if you are on an Alpine-based image, you can download the binary directly:
-            // wget https://github.com/aquasecurity/trivy/releases/download/v0.18.3/trivy_0.18.3_Linux-64bit.tar.gz
-            // tar -xzf trivy_0.18.3_Linux-64bit.tar.gz
-            // sudo mv trivy /usr/local/bin/
-
-            // Ensure the output directory exists
-            mkdir -p reporte-trivy
-
-            // Run Trivy scan and generate JSON report
-            trivy image --format json --output reporte-trivy/trivy-report.json ${DOCKER_IMAGE_NAME}
-        '''
-        archiveArtifacts artifacts: 'reporte-trivy/trivy-report.json', allowEmptyArchive: true
-    }    
+        steps {
+            echo "Building Docker image..."
+            sh '''
+                docker build -t ${DOCKER_IMAGE_NAME} -f Dockerfile .
+            '''
+            echo "Scanning image with Trivy..."
+            script {
+                // Install Trivy using the official method
+                sh '''
+                    curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+                    
+                    mkdir -p reporte-trivy
+                    
+                    trivy image --format json --output reporte-trivy/trivy-report.json ${DOCKER_IMAGE_NAME}
+                    
+                    trivy image --format table --output reporte-trivy/trivy-report.txt ${DOCKER_IMAGE_NAME}
+                '''
+            }
+            archiveArtifacts artifacts: 'reporte-trivy/trivy-report.json', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'reporte-trivy/trivy-report.txt', allowEmptyArchive: true
+        }
+    }   
 
     stage('Push Image (optional)') {
       when {
@@ -121,7 +118,7 @@ pipeline {
       }
     }
 
-    
+
 
     stage('Deploy to Staging (docker-compose)') {
       agent { label 'docker' }

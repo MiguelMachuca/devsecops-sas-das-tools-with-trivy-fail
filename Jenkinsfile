@@ -52,9 +52,10 @@ pipeline {
       steps {
         echo "Running SCA / Dependency-Check..."
         sh '''          
-          dependency-check --project "devsecops-labs" --scan . --format JSON --out dependency-check-reports/report.json
+          dependency-check --project "devsecops-labs" --scan . --format JSON --out report.json
+          ls -la
         '''
-        archiveArtifacts artifacts: 'dependency-check-reports/report.json', allowEmptyArchive: true
+        archiveArtifacts artifacts: 'report.json', allowEmptyArchive: true
       }
     }
 
@@ -98,7 +99,7 @@ pipeline {
         archiveArtifacts artifacts: 'trivy-reports/trivy-report.json', allowEmptyArchive: true
       }
     }
-    
+
     stage('Push Image (optional)') {
       when {
         expression { return env.DOCKER_REGISTRY != null && env.DOCKER_REGISTRY != "" }

@@ -94,11 +94,9 @@ pipeline {
                     
                     trivy image --format json --output reporte-trivy/trivy-report.json ${DOCKER_IMAGE_NAME}
                     
-                    trivy image --format table --output reporte-trivy/trivy-report.txt ${DOCKER_IMAGE_NAME}
                 '''
             }
             archiveArtifacts artifacts: 'reporte-trivy/trivy-report.json', allowEmptyArchive: true
-            archiveArtifacts artifacts: 'reporte-trivy/trivy-report.txt', allowEmptyArchive: true
         }
     }   
 
@@ -139,9 +137,10 @@ pipeline {
         echo "Running DAST (OWASP ZAP) against ${STAGING_URL} ..."
         sh '''
           mkdir -p zap-reports
-          docker run --rm --network host owasp/zap2docker-stable zap-baseline.py -t ${STAGING_URL} -r zap-reports/zap-report.html || true
+          # Use the correct, official Docker image
+          docker run --rm --network host ghcr.io/zaproxy/zaproxy:stable zap-baseline.py -t ${STAGING_URL} -r zap-reports/zap-report.html
         '''
-        archiveArtifacts artifacts: 'zap-reports/**', allowEmptyArchive: true
+        archiveArtifacts artifacts: 'zap-reports/zap-report.html', allowEmptyArchive: true
       }
     }
 

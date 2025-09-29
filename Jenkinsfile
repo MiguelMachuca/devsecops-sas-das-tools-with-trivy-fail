@@ -52,7 +52,11 @@ pipeline {
       steps {
         echo "Running SCA / Dependency-Check..."
         sh '''          
-          dependency-check --project "devsecops-labs" --scan . --format JSON --out report.json
+          /usr/share/dependency-check/bin/dependency-check.sh \
+            --project "devsecops-labs" \
+            --scan . \
+            --format JSON \
+            --out report.json
           ls -la
         '''
         archiveArtifacts artifacts: 'report.json', allowEmptyArchive: true

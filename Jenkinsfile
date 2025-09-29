@@ -77,8 +77,8 @@ pipeline {
         '''
       }
     }
-    
-    steps('Docker Build & Trivy Scan') {
+
+    stage('Docker Build & Trivy Scan') {
         echo "Building Docker image..."
         sh '''
             docker build -t ${DOCKER_IMAGE_NAME} -f Dockerfile .

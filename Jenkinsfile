@@ -54,8 +54,7 @@ pipeline {
                     --scan . 
                     --format JSON 
                     --format HTML
-                    --prettyPrint
-                    --nvdApiKey ${NVD_API_KEY}  # Opcional: para mejores velocidades
+                    --prettyPrint                    
                 '''
             )
 

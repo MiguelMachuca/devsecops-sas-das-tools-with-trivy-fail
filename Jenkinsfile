@@ -141,7 +141,7 @@ pipeline {
           docker run --rm \
             --network host \
             -v "$(pwd)/zap-reports:/zap/wrk/:rw" \
-            zaproxy/zap-stable \  // <- Nombre de imagen corregido
+            zaproxy/zap-stable \  
             zap-baseline.py \
             -t ${STAGING_URL} \
             -I \

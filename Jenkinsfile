@@ -140,7 +140,6 @@ pipeline {
                 docker run --rm \\
                     --network host \\
                     -v "$(pwd)/zap-reports:/zap/wrk/:rw" \\
-                    -v /var/run/docker.sock:/var/run/docker.sock \\
                     zaproxy/zap-stable \\
                     zap-baseline.py \\
                     -t ${STAGING_URL} \\
@@ -148,11 +147,12 @@ pipeline {
                     -r zap-report.html \\
                     -x zap-report.xml \\
                     -J zap-report.json
+                
+                # List contents to verify the files exist (for debugging)
+                echo "Contents of zap-reports directory:"
+                ls -la zap-reports/
             '''
-            // Diagnostic step to see what was actually created
-            sh 'find zap-reports -type f | head -n 10 || true'
-            // Try a broader pattern to find the reports
-            archiveArtifacts artifacts: 'zap-reports/**/*.*', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'zap-reports/zap-report.*', allowEmptyArchive: true
         }
     }
 

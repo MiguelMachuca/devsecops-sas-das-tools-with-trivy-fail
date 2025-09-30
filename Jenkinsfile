@@ -131,28 +131,27 @@ pipeline {
       }
     }
 
-    stage('DAST - OWASP ZAP Scan') {
-        agent { label 'docker' }
-        steps {
-            echo "Running DAST (OWASP ZAP) against ${STAGING_URL} ..."
-            sh '''
-                # Crear directorio para reportes con permisos de escritura
-                mkdir -p zap-reports
-                # Ejecutar el escaneo ZAP y forzar éxito siempre para no romper el pipeline
-                docker run --rm \\
-                    -v "$(pwd)/zap-reports:/zap/wrk/:rw" \\
-                    owasp/zap2docker-stable \\
-                    zap-baseline.py \\
-                    -t ${STAGING_URL} \\
-                    -I \\  # Ignora advertencias de certificados para entornos de prueba
-                    -r zap-report.html \\  # Genera reporte HTML
-                    -x zap-report.xml \\   # Genera reporte XML (útil para plugins)
-                    -J zap-report.json     # Genera reporte JSON
-                echo "ZAP scan completado. Revisa los reportes generados."
-            '''
-            // Archiva todos los reportes generados
-            archiveArtifacts artifacts: 'zap-reports/zap-report.*', allowEmptyArchive: true
-        }
+    stage('DAST - OWASP ZAP scan') {
+      agent { label 'docker' }
+      steps {
+        echo "Running DAST (OWASP ZAP) against ${STAGING_URL} ..."
+        sh '''
+          mkdir -p zap-reports
+          // El cambio clave está en la siguiente línea: usa 'zaproxy/zap-stable'
+          docker run --rm \
+            --network host \
+            -v "$(pwd)/zap-reports:/zap/wrk/:rw" \
+            zaproxy/zap-stable \  // <- Nombre de imagen corregido
+            zap-baseline.py \
+            -t ${STAGING_URL} \
+            -I \
+            -r zap-report.html \
+            -x zap-report.xml \
+            -J zap-report.json
+          echo "ZAP scan completado. Revisa los reportes generados."
+        '''
+        archiveArtifacts artifacts: 'zap-reports/zap-report.*', allowEmptyArchive: true
+      }
     }
 
     stage('Policy Check - Fail on HIGH/CRITICAL CVEs') {

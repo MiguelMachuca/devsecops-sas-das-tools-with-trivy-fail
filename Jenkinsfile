@@ -144,7 +144,7 @@ pipeline {
                 zap-baseline.py \
                 -t ${STAGING_URL} \
                 -I \
-                -w /zap/wrk \  # This forces ZAP to write reports to the mounted directory
+                -w /zap/wrk \  
                 -r zap-report.html \
                 -x zap-report.xml \
                 -J zap-report.json

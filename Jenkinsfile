@@ -140,6 +140,7 @@ pipeline {
                 docker run --rm \\
                     --network host \\
                     -v "$(pwd)/zap-reports:/zap/wrk/:rw" \\
+                    -v /var/run/docker.sock:/var/run/docker.sock \\
                     zaproxy/zap-stable \\
                     zap-baseline.py \\
                     -t ${STAGING_URL} \\

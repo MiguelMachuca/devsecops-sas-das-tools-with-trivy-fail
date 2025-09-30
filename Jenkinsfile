@@ -136,15 +136,14 @@ pipeline {
       steps {
         echo "Running DAST (OWASP ZAP) against ${STAGING_URL} ..."
         sh '''
-            mkdir -p zap-reports
             docker run --rm \
                 --network host \
                 -v "$(pwd)/zap-reports:/zap/wrk/:rw" \
                 zaproxy/zap-stable \
                 zap-baseline.py \
-                -t ${STAGING_URL} \
+                -t ''' + STAGING_URL + ''' \
                 -I \
-                -w /zap/wrk \  
+                -w /zap/wrk \
                 -r zap-report.html \
                 -x zap-report.xml \
                 -J zap-report.json

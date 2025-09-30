@@ -8,7 +8,7 @@ pipeline {
     DOCKER_IMAGE_NAME = "mangelmy/devsecops-app:latest"
     //DOCKER_IMAGE_NAME = "${env.DOCKER_REGISTRY}/devsecops-labs/app:latest"
     SSH_CREDENTIALS = "ssh-deploy-key"
-    STAGING_URL = "http://localhost:3000"
+    STAGING_URL = "http://172.17.0.1:3000"
   }
 
   options {
@@ -134,23 +134,9 @@ pipeline {
     stage('DAST - OWASP ZAP Scan') {
         steps {
             script {
-                // Example for a Linux agent. The path must be where ZAP is installed on your build machine.
-                startZap(host: "127.0.0.1", port: 3000, timeout: 5000, externalZap: true)
+                startZap(host: "172.17.0.1", port: 8080, timeout: 5000, externalZap: true)
                 runZapCrawler(host: "${STAGING_URL}")
                 runZapAttack()
-            }
-        }
-        post {
-            always {
-                script {
-                    // Generate and archive the report
-                    archiveZap(
-                        failAllAlerts: 0,
-                        failHighAlerts: 1,
-                        failMediumAlerts: 5,
-                        failLowAlerts: 0
-                    )
-                }
             }
         }
     } 

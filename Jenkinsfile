@@ -136,15 +136,17 @@ pipeline {
       steps {
         echo "Running DAST (OWASP ZAP) against ${STAGING_URL} ..."
         sh '''
-            docker run --rm \\
-                --network host \\
-                -v "$(pwd)/zap-reports:/zap/wrk/:rw" \\
-                zaproxy/zap-stable \\
-                zap-baseline.py \\
-                -t ${STAGING_URL} \\
-                -I \\
-                -r zap-report.html \\
-                -x zap-report.xml \\
+            mkdir -p zap-reports
+            docker run --rm \
+                --network host \
+                -v "$(pwd)/zap-reports:/zap/wrk/:rw" \
+                zaproxy/zap-stable \
+                zap-baseline.py \
+                -t ${STAGING_URL} \
+                -I \
+                -w /zap/wrk \  # This forces ZAP to write reports to the mounted directory
+                -r zap-report.html \
+                -x zap-report.xml \
                 -J zap-report.json
         '''
         archiveArtifacts artifacts: 'zap-reports/zap-report.*', allowEmptyArchive: true

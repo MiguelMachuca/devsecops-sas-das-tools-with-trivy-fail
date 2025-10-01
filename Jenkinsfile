@@ -137,14 +137,19 @@ pipeline {
         echo "Running DAST (OWASP ZAP) against ${STAGING_URL} ..."
         sh '''
           mkdir -p zap-reports
+          chmod 777 zap-reports  # Dar permisos completos temporalmente
+          
           docker run --rm --network host \
-            -v "$(pwd)/zap-reports:/zap/wrk/output" \
+            -v "$(pwd)/zap-reports:/zap/wrk/output:rw" \
+            -u root \
             zaproxy/zap-stable zap-baseline.py \
             -t ${STAGING_URL} \
-            -r zap-report.html || true
+            -r /zap/wrk/output/zap-report.html || true
           
           # Verificar que el archivo se creó
           ls -la zap-reports/
+          echo "Archivos en zap-reports:"
+          find zap-reports -type f
         '''
         archiveArtifacts artifacts: 'zap-reports/zap-report.html', allowEmptyArchive: true
       }

@@ -141,6 +141,8 @@ pipeline {
         steps {
             sh 'zap-baseline.py -t ${STAGING_URL} -J /zap/wrk/zap-report.json -r /zap/wrk/zap-report.html -I'
             sh 'ls -la'
+            sh 'pwd'
+            sh 'find / -name "zap-report.*" 2>/dev/null || true'
             archiveArtifacts artifacts: 'zap-report.html,zap-report.json', allowEmptyArchive: true
         }
     }  

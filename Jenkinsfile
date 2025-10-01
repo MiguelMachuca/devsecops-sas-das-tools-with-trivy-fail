@@ -135,11 +135,11 @@ pipeline {
         agent {
             docker {
                 image 'zaproxy/zap-stable:latest'
-                args '-v $WORKSPACE/zap-reports:/zap/wrk:rw'  // Monta el volumen
+                args '-v $WORKSPACE/zap-reports:/zap/wrk:rw --network=host'  
             }
         }
         steps {
-            sh 'zap-baseline.py -t http://tu-aplicacion.com -J zap-report.json -r zap-report.html -I'
+            sh 'zap-baseline.py -t ${STAGING_URL} -J zap-report.json -r zap-report.html -I'
             archiveArtifacts artifacts: 'zap-reports/*.html,zap-reports/*.json', allowEmptyArchive: true
         }
     }  

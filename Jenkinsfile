@@ -139,11 +139,11 @@ pipeline {
             }
         }
         steps {
-            sh 'zap-baseline.py -t ${STAGING_URL} -J /zap/wrk/zap-report.json -r /zap/wrk/zap-report.html -I'
+            sh 'zap-baseline.py -t ${STAGING_URL} -J zap-reports/zap-report.json -r zap-reports/zap-report.html -I'
             sh 'ls -la'
             sh 'pwd'
             sh 'find / -name "zap-report.*" 2>/dev/null || true'
-            archiveArtifacts artifacts: '/zap/wrk/zap-reports/zap-report.html, /zap/wrk/zap-reports/zap-report.json', allowEmptyArchive: true
+            archiveArtifacts artifacts: '/zap-reports/zap-report.html, zap-reports/zap-report.json', allowEmptyArchive: true
         }
     }  
 

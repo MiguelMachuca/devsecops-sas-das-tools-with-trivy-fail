@@ -137,7 +137,7 @@ pipeline {
             echo "Running DAST (OWASP ZAP) against ${STAGING_URL} ..."
             sh '''
                 mkdir -p zap-reports
-                docker run --rm --network host -v "$(pwd)/zap-reports:/zap/wrk/:rw" zaproxy/zap-stable zap-baseline.py -t ${STAGING_URL} -I -r output/zap-report.html -J /output/zap-report.json
+                docker run --rm --network host -v "$(pwd)/zap-reports:/zap/wrk/output:rw" zaproxy/zap-stable zap-baseline.py -t ${STAGING_URL} -I -r /output/zap-report.html -J /output/zap-report.json
             '''
             
             archiveArtifacts artifacts: 'output/**', allowEmptyArchive: true

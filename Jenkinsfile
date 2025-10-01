@@ -143,7 +143,8 @@ pipeline {
             sh 'ls -la'
             sh 'pwd'
             sh 'find / -name "zap-report.*" 2>/dev/null || true'
-            archiveArtifacts artifacts: '/zap-reports/zap-report.html, zap-reports/zap-report.json', allowEmptyArchive: true
+            sh 'ls -la /zap/wrk/'
+            archiveArtifacts artifacts: '/zap/wrk/zap-reports/zap-report.html', allowEmptyArchive: true
         }
     }  
 

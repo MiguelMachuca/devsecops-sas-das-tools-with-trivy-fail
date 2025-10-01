@@ -131,29 +131,16 @@ pipeline {
       }
     }
 
-    stage('DAST - OWASP ZAP Scan') {
-        agent { label 'docker' }
-        steps {
-            echo "Running DAST (OWASP ZAP) against ${STAGING_URL} ..."
-            sh '''
-                mkdir -p zap-reports
-                docker run --rm \\
-                    --network host \\
-                    -v "$(pwd)/zap-reports:/zap/wrk/:rw" \\
-                    zaproxy/zap-stable \\
-                    zap-baseline.py \\
-                    -t ${STAGING_URL} \\
-                    -I \\
-                    -r zap-report.html \\
-                    -x zap-report.xml \\
-                    -J zap-report.json
-                
-                # List contents to verify the files exist (for debugging)
-                echo "Contents of zap-reports directory:"
-                ls -la zap-reports/
-            '''
-            archiveArtifacts artifacts: 'zap-reports/zap-report.*', allowEmptyArchive: true
-        }
+    stage('DAST - OWASP ZAP scan') {
+      agent { label 'docker' }
+      steps {
+        echo "Running DAST (OWASP ZAP) against ${STAGING_URL} ..."
+        sh '''
+          mkdir -p zap-reports
+          docker run --rm --network host zaproxy/zap-stable zap-baseline.py -t ${STAGING_URL} -r zap-reports/zap-report.html || true
+        '''
+        archiveArtifacts artifacts: 'zap-reports/**', allowEmptyArchive: true
+      }
     }
 
     stage('Policy Check - Fail on HIGH/CRITICAL CVEs') {

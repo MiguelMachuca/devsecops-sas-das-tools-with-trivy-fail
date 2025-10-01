@@ -135,12 +135,12 @@ pipeline {
         agent {
             docker {
                 image 'zaproxy/zap-stable:latest'
-                args '-v $WORKSPACE/zap-reports:/zap/wrk:rw --network=host'  
+                args '--network=host'  
             }
         }
         steps {
             sh 'zap-baseline.py -t ${STAGING_URL} -J zap-report.json -r zap-report.html -I'
-            archiveArtifacts artifacts: 'zap-reports/*.html,zap-reports/*.json', allowEmptyArchive: true
+            archiveArtifacts artifacts: '*.html,*.json', allowEmptyArchive: true
         }
     }  
 

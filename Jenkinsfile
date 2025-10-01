@@ -135,7 +135,7 @@ pipeline {
         agent {
             docker {
                 image 'zaproxy/zap-stable:latest'
-                args '--network=host'  
+                args '-v $PWD/zap-reports:/zap/wrk:rw --network=host'  
             }
         }
         steps {

@@ -140,7 +140,7 @@ pipeline {
         }
         steps {
             sh 'zap-baseline.py -t ${STAGING_URL} -J zap-report.json -r zap-report.html -I'
-            archiveArtifacts artifacts: '*.html,*.json', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'zap-report.html,zap-report.json', allowEmptyArchive: true
         }
     }  
 

@@ -32,11 +32,7 @@ pipeline {
                           --soft-fail \
                           --output json --output-file-path checkov-results \
                           --output junitxml --output-file-path checkov-results
-                        
-                        # Verificar qué archivos se crearon
-                        echo "=== Contenido del directorio results-checkov/ ==="
-                        ls -la results-checkov/
-                        
+                                          
                         # Copiar y renombrar los archivos con nombres más descriptivos
                         cp results-checkov/results_json.json checkov-scan-results.json
                         cp results-checkov/results_junitxml.xml checkov-scan-results.xml
@@ -44,19 +40,14 @@ pipeline {
                         # Limpiar archivos temporales y directorio
                         rm -rf results-checkov/
                         
-                        # Verificar solo los archivos finales que queremos
-                        echo "=== Archivos finales que se archivarán ==="
-                        ls -la checkov-scan-results.*
                     '''
                 }
             }
         }
         post {
             always {
-                // Publicar resultados de pruebas JUnit
                 junit testResults: 'checkov-scan-results.xml', allowEmptyResults: true
                 
-                // Archivar SOLO los archivos renombrados que queremos
                 archiveArtifacts artifacts: 'checkov-scan-results.json, checkov-scan-results.xml', allowEmptyArchive: true
             }
         }

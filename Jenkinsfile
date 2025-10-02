@@ -23,24 +23,20 @@ pipeline {
         steps {
             script {
                 docker.image('bridgecrew/checkov:latest').inside("--entrypoint=''") {
-                    sh '''
-                        # Limpiar archivos previos
-                        rm -f checkov-report.* checkov-scan-results.*
-                        
-                        # Ejecutar Checkov - generará archivos en directorio results-checkov/
-                        checkov -f docker-compose.yml -f Dockerfile \
-                          --soft-fail \
-                          --output json --output-file-path checkov-results \
-                          --output junitxml --output-file-path checkov-results
-                                          
-                        # Copiar y renombrar los archivos con nombres más descriptivos
-                        cp results-checkov/results_json.json checkov-scan-results.json
-                        cp results-checkov/results_junitxml.xml checkov-scan-results.xml
-                        
-                        # Limpiar archivos temporales y directorio
-                        rm -rf results-checkov/
-                        
-                    '''
+                  sh '''
+                      # Limpiar archivos previos
+                      rm -f checkov-report.* checkov-scan-results.*
+                      
+                      # Ejecutar Checkov - This works and generates files
+                      checkov -f docker-compose.yml -f Dockerfile \
+                        --soft-fail \
+                        --output json --output-file-path checkov-results \
+                        --output junitxml --output-file-path checkov-results
+
+                      # Copy from the correct location: current directory
+                      cp checkov-results_json.json checkov-scan-results.json
+                      cp checkov-results_junitxml.xml checkov-scan-results.xml
+                  '''
                 }
             }
         }

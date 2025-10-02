@@ -35,6 +35,8 @@ pipeline {
                           --output junitxml --output-file-path checkov-results
                                           
                         # Copiar y renombrar los archivos con nombres más descriptivos
+                        ls -la
+                        pwd
                         cp results-checkov/results_json.json checkov-scan-results.json
                         cp results-checkov/results_junitxml.xml checkov-scan-results.xml
                         

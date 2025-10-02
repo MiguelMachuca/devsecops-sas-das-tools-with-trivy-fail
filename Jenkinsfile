@@ -24,6 +24,9 @@ pipeline {
             script {
                 docker.image('bridgecrew/checkov:latest').inside("--entrypoint=''") {
                     sh '''
+                        # Limpiar archivos previos
+                        rm -f checkov-report.* checkov-scan-results.*
+                        
                         # Ejecutar Checkov - generará archivos en directorio results-checkov/
                         checkov -f docker-compose.yml -f Dockerfile \
                           --soft-fail \
@@ -38,9 +41,12 @@ pipeline {
                         cp results-checkov/results_json.json checkov-scan-results.json
                         cp results-checkov/results_junitxml.xml checkov-scan-results.xml
                         
-                        # Verificar los archivos renombrados
-                        echo "=== Archivos finales ==="
-                        ls -la checkov-*.json checkov-*.xml
+                        # Limpiar archivos temporales y directorio
+                        rm -rf results-checkov/
+                        
+                        # Verificar solo los archivos finales que queremos
+                        echo "=== Archivos finales que se archivarán ==="
+                        ls -la checkov-scan-results.*
                     '''
                 }
             }
@@ -50,8 +56,8 @@ pipeline {
                 // Publicar resultados de pruebas JUnit
                 junit testResults: 'checkov-scan-results.xml', allowEmptyResults: true
                 
-                // Archivar todos los reportes de Checkov
-                archiveArtifacts artifacts: 'checkov-*.json, checkov-*.xml, results-checkov/**', allowEmptyArchive: true
+                // Archivar SOLO los archivos renombrados que queremos
+                archiveArtifacts artifacts: 'checkov-scan-results.json, checkov-scan-results.xml', allowEmptyArchive: true
             }
         }
     }

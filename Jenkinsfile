@@ -29,7 +29,8 @@ pipeline {
             script {
                 sh '''
                     cd /zap/wrk
-                    zap-baseline.py -t ${STAGING_URL} -J zap-report.json -r zap-report.html -I
+                    # Generar reportes en JSON, HTML y XML
+                    zap-baseline.py -t ${STAGING_URL} -J zap-report.json -r zap-report.html -x zap-report.xml -I
                     # Copiar los reportes al workspace principal
                     cp zap-report.* $WORKSPACE/ || true
                 '''
@@ -37,7 +38,7 @@ pipeline {
         }
         post {
             always {
-                // Ahora sí estarán en el workspace principal
+                // Archivar todos los reportes (json, html, xml)
                 archiveArtifacts artifacts: 'zap-report.*', allowEmptyArchive: true
             }
         }

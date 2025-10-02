@@ -18,20 +18,28 @@ pipeline {
 
   stages {
 
-    steps {
-        script {
-            sh '''
-                cd /zap/wrk
-                zap-baseline.py -t ${STAGING_URL} -J zap-report.json -r zap-report.html -I
-                # Copiar los reportes al workspace principal
-                cp zap-report.* $WORKSPACE/ || true
-            '''
+    stage('DAST - OWASP ZAP Scan con Reporte') {
+        agent {
+            docker {
+                image 'zaproxy/zap-stable:latest'
+                args '-v $WORKSPACE:/zap/wrk:rw --network=host'  
+            }
         }
-    }
-    post {
-        always {
-            // Ahora sí estarán en el workspace principal
-            archiveArtifacts artifacts: 'zap-report.*', allowEmptyArchive: true
+        steps {
+            script {
+                sh '''
+                    cd /zap/wrk
+                    zap-baseline.py -t ${STAGING_URL} -J zap-report.json -r zap-report.html -I
+                    # Copiar los reportes al workspace principal
+                    cp zap-report.* $WORKSPACE/ || true
+                '''
+            }
+        }
+        post {
+            always {
+                // Ahora sí estarán en el workspace principal
+                archiveArtifacts artifacts: 'zap-report.*', allowEmptyArchive: true
+            }
         }
     }
   }

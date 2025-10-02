@@ -46,21 +46,21 @@ pipeline {
     }
 
     stage('SCA - Dependency Check') {
-        steps {         
-            dependencyCheck (
-                odcInstallation: 'OWASP-DepCheck-10', 
+        steps {
+            dependencyCheck(
+                odcInstallation: 'OWASP-DepCheck-10',
                 additionalArguments: '''
-                    --project "devsecops-labs" 
-                    --scan . 
-                    --format JSON 
+                    --project "devsecops-labs"
+                    --scan .
+                    --format XML  // 🟢 Agrega XML como formato de salida
                     --format HTML
-                    --prettyPrint                    
+                    --prettyPrint
                 '''
             )
+            
+            dependencyCheckPublisher pattern: 'dependency-check-report.xml'  // 🟢 Publica el reporte XML
 
-            dependencyCheckPublisher pattern: 'dependency-check-report.json'
-
-            archiveArtifacts artifacts: 'dependency-check-report.json', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'dependency-check-report.xml, dependency-check-report.html', allowEmptyArchive: true  // 🟢 Archiva ambos reportes
         }
     }
 
@@ -115,7 +115,6 @@ pipeline {
         }
       }
     }
-
 
     stage('IaC Scan - Checkov') {
       agent {

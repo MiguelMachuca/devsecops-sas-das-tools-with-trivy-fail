@@ -28,30 +28,23 @@ pipeline {
           }
       }
       steps {
-          script {
-              // Crear directorio en la ubicación correcta
-              sh 'mkdir -p /zap/wrk/zap-reports'
-              
-              // Cambiar al directorio de trabajo correcto antes de ejecutar ZAP
-              sh 'cd /zap/wrk'
-              
-              // Ejecutar ZAP con rutas relativas al directorio de trabajo
-              sh 'zap-baseline.py -t ${STAGING_URL} -J zap-reports/zap-report.json -r zap-reports/zap-report.html'
-              
-              // Verificar que los archivos se crearon correctamente
-              sh 'ls -la /zap/wrk/zap-reports/'
-              
-              // También verificar desde la perspectiva del workspace
-              sh 'ls -la zap-reports/ || echo "No existe en workspace relativo"'
-          }
+          sh '''
+              pwd
+              ls -la
+              zap-baseline.py -t ${STAGING_URL} -J zap-report.json -r zap-report.html
+              ls -la
+          '''
+          sh 'pwd' 
+          sh 'env | grep WORKSPACE'  
+          sh 'find . -name "zap-report*" 2>/dev/null || echo "No se encontraron reportes"'  
       }
       post {
           always {
-              // Archivar usando patrón que busca en todo el workspace :cite[1]:cite[6]
-              archiveArtifacts artifacts: '**/zap-report.*', allowEmptyArchive: true
+              archiveArtifacts artifacts: 'zap-report.*', allowEmptyArchive: true
           }
       }
   }
+
   post {
     always {
       echo "Pipeline finished. Collecting artifacts..."

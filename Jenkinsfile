@@ -48,6 +48,8 @@ pipeline {
         }
     }
 
+  }
+
   post {
     always {
       echo "Pipeline finished. Collecting artifacts..."

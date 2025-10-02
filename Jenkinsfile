@@ -27,23 +27,16 @@ pipeline {
         }
         steps {
             script {
-                // Cambiar al directorio montado que ZAP requiere
                 sh '''
                     cd /zap/wrk
-                    pwd
-                    ls -la
                     zap-baseline.py -t ${STAGING_URL} -J zap-report.json -r zap-report.html -I
-                    ls -la
                 '''
-                
-                // Verificar que los reportes se crearon
-                sh 'ls -la /zap/wrk/zap-report.* || echo "No se encontraron reportes en /zap/wrk"'
             }
         }
         post {
             always {
-                // Archivar los reportes - ahora estarán en el workspace gracias al volumen
-                archiveArtifacts artifacts: 'zap-report.*', allowEmptyArchive: true
+                // Busca en todo el workspace recursivamente
+                archiveArtifacts artifacts: '**/zap-report.*', allowEmptyArchive: true
             }
         }
     }

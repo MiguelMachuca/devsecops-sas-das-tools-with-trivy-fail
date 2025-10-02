@@ -26,17 +26,16 @@ pipeline {
                     sh '''
                         checkov -f docker-compose.yml -f Dockerfile \
                           --soft-fail \
-                          --output json --output-file-path checkov-report.json \
-                          --output junitxml --output-file-path checkov-report.xml
+                          --output checkov --output-file-path checkov-report.json \
+                          --output checkov --output-file-path checkov-report.xml
                     '''
                     sh 'ls -la checkov-report.*'
                 }
             }
         }
         post {
-            always {
-                junit testResults: 'checkov-report.xml', allowEmptyResults: true
-                archiveArtifacts artifacts: 'checkov-report.*', allowEmptyArchive: true
+            always {                
+                archiveArtifacts artifacts: 'results_checkov.*', allowEmptyArchive: true
             }
         }
     }

@@ -43,6 +43,7 @@ pipeline {
               archiveArtifacts artifacts: 'zap-report.*', allowEmptyArchive: true
           }
       }
+    } 
   }
 
   post {

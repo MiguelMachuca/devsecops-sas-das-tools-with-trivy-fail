@@ -25,7 +25,7 @@ pipeline {
                 docker.image('bridgecrew/checkov:latest').inside("--entrypoint=''") {
                     sh '''
                         # Limpiar archivos previos
-                        rm -f checkov-report.* checkov-scan-results.*
+                        rm -f checkov-scan-results.*
                         
                         # Ejecutar Checkov - generará archivos en directorio results-checkov/
                         
@@ -35,17 +35,14 @@ pipeline {
                           --output junitxml --output-file-path checkov-results
                                           
                         # Copiar y renombrar los archivos con nombres más descriptivos
-                        ls -la
-                        pwd
+
                         cp checkov-results/results_json.json checkov-scan-results.json
                         cp checkov-results/results_junitxml.xml checkov-scan-results.xml
                         
                         # Limpiar archivos temporales y directorio
-                        ls -la
-                        rm -rf results-checkov/
-                        ls -la
+                      
+                        rm -rf checkov-results/
 
-                        
                     '''
                 }
             }

@@ -23,27 +23,40 @@ pipeline {
         agent {
             docker {
                 image 'zaproxy/zap-stable:latest'
-                args '--network=host'  // ELIMINADO el volumen
+                args '--network=host'  
             }
         }
         steps {
             script {
-                // Ejecutar ZAP y manejar el código de salida
-                // ZAP retorna 2 cuando encuentra warnings, pero queremos continuar
-                def zapExitCode = sh(
-                    script: "zap-baseline.py -t ${STAGING_URL} -J zap-report.json -r zap-report.html || true",
-                    returnStatus: true
-                )
+                // Cambiar al directorio que ZAP espera o usar rutas relativas
+                sh '''
+                    pwd
+                    ls -la
+                    zap-baseline.py -t ${STAGING_URL} -J ./zap-report.json -r ./zap-report.html -I
+                    ls -la
+                '''
                 
-                echo "ZAP ejecutado con código de salida: ${zapExitCode}"
-                echo "Los reportes deberían estar en:"
-                sh 'pwd && ls -la zap-report.* || echo "No se encontraron reportes"'
+                // Buscar reportes en todo el workspace
+                sh 'find . -name "*zap-report*" -type f 2>/dev/null || echo "No se encontraron reportes"'
+
+                sh '''
+                    echo "=== Diagnóstico del sistema ==="
+                    pwd
+                    echo "=== Contenido del directorio actual ==="
+                    ls -la
+                    echo "=== Buscando reportes ZAP ==="
+                    find . -name "*.json" -o -name "*.html" 2>/dev/null | grep -v node_modules || echo "No se encontraron archivos de reporte"
+                    echo "=== Espacio en disco ==="
+                    df -h
+                '''
+
+                sh 'whoami && id'                
             }
         }
         post {
             always {
-                // Archivar los reportes independientemente del resultado de ZAP
-                archiveArtifacts artifacts: 'zap-report.*', allowEmptyArchive: true
+                // Archivar con patrón más amplio
+                archiveArtifacts artifacts: '**/zap-report.*', allowEmptyArchive: true
             }
         }
     }

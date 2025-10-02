@@ -24,23 +24,37 @@ pipeline {
             script {
                 docker.image('bridgecrew/checkov:latest').inside("--entrypoint=''") {
                     sh '''
+                        # Ejecutar Checkov - generará archivos en directorio results-checkov/
                         checkov -f docker-compose.yml -f Dockerfile \
                           --soft-fail \
-                          --output checkov --output-file-path checkov-report.json \
-                          --output checkov --output-file-path checkov-report.xml
+                          --output json --output-file-path checkov-results \
+                          --output junitxml --output-file-path checkov-results
+                        
+                        # Verificar qué archivos se crearon
+                        echo "=== Contenido del directorio results-checkov/ ==="
+                        ls -la results-checkov/
+                        
+                        # Copiar y renombrar los archivos con nombres más descriptivos
+                        cp results-checkov/results_json.json checkov-scan-results.json
+                        cp results-checkov/results_junitxml.xml checkov-scan-results.xml
+                        
+                        # Verificar los archivos renombrados
+                        echo "=== Archivos finales ==="
+                        ls -la checkov-*.json checkov-*.xml
                     '''
-                    sh 'ls -la checkov-report.*'
                 }
             }
         }
         post {
-            always {                
-                archiveArtifacts artifacts: 'results_checkov.*', allowEmptyArchive: true
+            always {
+                // Publicar resultados de pruebas JUnit
+                junit testResults: 'checkov-scan-results.xml', allowEmptyResults: true
+                
+                // Archivar todos los reportes de Checkov
+                archiveArtifacts artifacts: 'checkov-*.json, checkov-*.xml, results-checkov/**', allowEmptyArchive: true
             }
         }
     }
-
-
   }
 
   post {

@@ -28,7 +28,7 @@ pipeline {
                         rm -f checkov-report.* checkov-scan-results.*
                         
                         # Ejecutar Checkov - generará archivos en directorio results-checkov/
-                        mkdir results-checkov
+                        
                         checkov -f docker-compose.yml -f Dockerfile \
                           --soft-fail \
                           --output json --output-file-path checkov-results \

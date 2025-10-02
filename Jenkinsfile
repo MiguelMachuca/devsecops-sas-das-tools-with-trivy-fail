@@ -18,31 +18,48 @@ pipeline {
 
   stages {
 
-    stage('DAST - OWASP ZAP Scan con Reporte') {
-        agent {
-            docker {
-                image 'zaproxy/zap-stable:latest'
-                args '-v $WORKSPACE:/zap/wrk:rw --network=host'  
-            }
-        }
+    stage('IaC Scan - Checkov') {
+        agent any
         steps {
             script {
-                sh '''
-                    cd /zap/wrk
-                    # Generar reportes en JSON, HTML y XML
-                    zap-baseline.py -t ${STAGING_URL} -J zap-report.json -r zap-report.html -x zap-report.xml -I
-                    # Copiar los reportes al workspace principal
-                    cp zap-report.* $WORKSPACE/ || true
-                '''
-            }
-        }
-        post {
-            always {
-                // Archivar todos los reportes (json, html, xml)
-                archiveArtifacts artifacts: 'zap-report.*', allowEmptyArchive: true
+                def jenkinsWorkspace = pwd()
+                
+                docker.image('bridgecrew/checkov:latest').inside("--entrypoint=''") {
+                    
+                    sh '''
+                      checkov -f docker-compose.yml -f Dockerfile \
+                        --soft-fail \
+                        --output json --output-file-path results-checkov.json \
+                        --output junitxml --output-file-path results-checkov
+                    '''
+
+                    sh 'ls -la'
+                    
+   
+                    sh """
+                        if [ -f "results-checkov.json" ]; then
+                            cp results-checkov.json ${jenkinsWorkspace}/checkov-results.json
+                        elif [ -d "results-checkov" ]; then
+                            cp -r results-checkov/* ${jenkinsWorkspace}/
+                        fi
+                    """
+                }
+                
+                // Publicar resultados JUnit si existen
+                script {
+                    if (fileExists('results-checkov/results_junitxml.xml')) {
+                        junit skipPublishingChecks: true, testResults: 'results-checkov/results_junitxml.xml'
+                    } else if (fileExists('results_junitxml.xml')) {
+                        junit skipPublishingChecks: true, testResults: 'results_junitxml.xml'
+                    } else {
+                        echo 'WARNING: No se encontraron archivos de resultados JUnit para publicar'
+                    }
+                }
             }
         }
     }
+
+
   }
 
   post {

@@ -141,7 +141,7 @@ pipeline {
       }
     }
 
-    stage('DAST - OWASP ZAP Scan con Reporte') {
+    stage('DAST - OWASP ZAP Scan') {
         agent {
             docker {
                 image 'zaproxy/zap-stable:latest'
@@ -149,14 +149,23 @@ pipeline {
             }
         }
         steps {
-            sh 'zap-baseline.py -t ${STAGING_URL} -J zap-reports/zap-report.json -r zap-reports/zap-report.html'
-            sh 'ls -la'
-            sh 'pwd'
-            sh 'find / -name "zap-report.*" 2>/dev/null || true'
-            sh 'ls -la /zap/wrk/'
-            archiveArtifacts artifacts: '/zap/wrk/zap-reports/zap-report.html', allowEmptyArchive: true
+            script {
+                sh '''
+                    cd /zap/wrk
+                    # Generar reportes en JSON, HTML y XML
+                    zap-baseline.py -t ${STAGING_URL} -J zap-report.json -r zap-report.html -x zap-report.xml -I
+                    # Copiar los reportes al workspace principal
+                    cp zap-report.* $WORKSPACE/ || true
+                '''
+            }
         }
-    }  
+        post {
+            always {
+                // Archivar todos los reportes (json, html, xml)
+                archiveArtifacts artifacts: 'zap-report.*', allowEmptyArchive: true
+            }
+        }
+    }
 
     stage('Policy Check - Fail on HIGH/CRITICAL CVEs') {
     steps {

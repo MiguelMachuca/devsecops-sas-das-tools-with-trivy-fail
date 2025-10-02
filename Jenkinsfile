@@ -91,7 +91,7 @@ pipeline {
                   
                   Reportes disponibles en los artifacts del build.
                   """,
-                  to: "infradockers@gmail.com"
+                  to: "mmangeliguel@gmail.com"
               )
           }
       }
@@ -111,7 +111,7 @@ pipeline {
                   
                   Por favor revisar los logs para más detalles.
                   """,
-                  to: "infradockers@gmail.com"
+                  to: "mmangeliguel@gmail.com"
               )
           }
       }
@@ -131,7 +131,7 @@ pipeline {
                   
                   Se requiere revisión manual.
                   """,
-                  to: "infradockers@gmail.com"
+                  to: "mmangeliguel@gmail.com"
               )
           }
       }

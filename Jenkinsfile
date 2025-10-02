@@ -20,32 +20,38 @@ pipeline {
   stages {
 
 
-    stage('DAST - OWASP ZAP Scan con Reporte') {
-        agent {
-            docker {
-                image 'zaproxy/zap-stable:latest'
-                args '-v $WORKSPACE:/zap/wrk:rw --network=host'  
-            }
-        }
-        steps {
-            // Crear el directorio para los reportes primero
-            sh 'mkdir -p /zap/wrk/zap-reports'
-            
-            // Ejecutar ZAP y generar reportes
-            sh 'zap-baseline.py -t ${STAGING_URL} -J /zap/wrk/zap-reports/zap-report.json -r /zap/wrk/zap-reports/zap-report.html'
-            
-            // Verificar que los archivos se crearon
-            sh 'ls -la /zap/wrk/zap-reports/'
-        }
-        post {
-            always {
-                // Archivar los reportes desde el workspace (no desde el volumen del contenedor)
-                archiveArtifacts artifacts: 'zap-reports/*', allowEmptyArchive: true
-            }
-        }
-    }  
+  stage('DAST - OWASP ZAP Scan con Reporte') {
+      agent {
+          docker {
+              image 'zaproxy/zap-stable:latest'
+              args '-v $WORKSPACE:/zap/wrk:rw --network=host'  
+          }
+      }
+      steps {
+          script {
+              // Crear directorio en la ubicación correcta
+              sh 'mkdir -p /zap/wrk/zap-reports'
+              
+              // Cambiar al directorio de trabajo correcto antes de ejecutar ZAP
+              sh 'cd /zap/wrk'
+              
+              // Ejecutar ZAP con rutas relativas al directorio de trabajo
+              sh 'zap-baseline.py -t ${STAGING_URL} -J zap-reports/zap-report.json -r zap-reports/zap-report.html'
+              
+              // Verificar que los archivos se crearon correctamente
+              sh 'ls -la /zap/wrk/zap-reports/'
+              
+              // También verificar desde la perspectiva del workspace
+              sh 'ls -la zap-reports/ || echo "No existe en workspace relativo"'
+          }
+      }
+      post {
+          always {
+              // Archivar usando patrón que busca en todo el workspace :cite[1]:cite[6]
+              archiveArtifacts artifacts: '**/zap-report.*', allowEmptyArchive: true
+          }
+      }
   }
-
   post {
     always {
       echo "Pipeline finished. Collecting artifacts..."

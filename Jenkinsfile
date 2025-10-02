@@ -61,8 +61,10 @@ pipeline {
       always {
           echo "Pipeline execution completed - Status: ${currentBuild.result}"
           
-          // Archivar TODOS los reportes de seguridad
-          archiveArtifacts artifacts: '**/*report*, **/*results*, **/*.xml, **/*.json', allowEmptyArchive: true
+          // Archivar reportes, excluyendo package.json y package-lock.json
+          archiveArtifacts artifacts: '**/*report*, **/*results*, **/*.xml, **/*.json', 
+                        excludes: '**/package.json, **/package-lock.json', 
+                        allowEmptyArchive: true
           
           // Publicar reportes consolidados
           junit testResults: '**/*.xml', allowEmptyResults: true
